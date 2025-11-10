@@ -1,0 +1,1 @@
+Node 5002. Time: 1. Wrote to critical resource.

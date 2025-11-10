@@ -21,27 +21,28 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Request struct {
+type Message struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Timestamp     *int64                 `protobuf:"varint,1,opt,name=timestamp" json:"timestamp,omitempty"`
+	Id            *int64                 `protobuf:"varint,2,opt,name=id" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Request) Reset() {
-	*x = Request{}
+func (x *Message) Reset() {
+	*x = Message{}
 	mi := &file_grpc_consensus_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Request) String() string {
+func (x *Message) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Request) ProtoMessage() {}
+func (*Message) ProtoMessage() {}
 
-func (x *Request) ProtoReflect() protoreflect.Message {
+func (x *Message) ProtoReflect() protoreflect.Message {
 	mi := &file_grpc_consensus_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -53,21 +54,28 @@ func (x *Request) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Request.ProtoReflect.Descriptor instead.
-func (*Request) Descriptor() ([]byte, []int) {
+// Deprecated: Use Message.ProtoReflect.Descriptor instead.
+func (*Message) Descriptor() ([]byte, []int) {
 	return file_grpc_consensus_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *Request) GetTimestamp() int64 {
+func (x *Message) GetTimestamp() int64 {
 	if x != nil && x.Timestamp != nil {
 		return *x.Timestamp
 	}
 	return 0
 }
 
+func (x *Message) GetId() int64 {
+	if x != nil && x.Id != nil {
+		return *x.Id
+	}
+	return 0
+}
+
 type Reply struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Timestamp     *int64                 `protobuf:"varint,1,opt,name=timestamp" json:"timestamp,omitempty"`
+	IsQueued      *bool                  `protobuf:"varint,1,opt,name=isQueued" json:"isQueued,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -102,24 +110,64 @@ func (*Reply) Descriptor() ([]byte, []int) {
 	return file_grpc_consensus_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *Reply) GetTimestamp() int64 {
-	if x != nil && x.Timestamp != nil {
-		return *x.Timestamp
+func (x *Reply) GetIsQueued() bool {
+	if x != nil && x.IsQueued != nil {
+		return *x.IsQueued
 	}
-	return 0
+	return false
+}
+
+type Released struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Released) Reset() {
+	*x = Released{}
+	mi := &file_grpc_consensus_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Released) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Released) ProtoMessage() {}
+
+func (x *Released) ProtoReflect() protoreflect.Message {
+	mi := &file_grpc_consensus_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Released.ProtoReflect.Descriptor instead.
+func (*Released) Descriptor() ([]byte, []int) {
+	return file_grpc_consensus_proto_rawDescGZIP(), []int{2}
 }
 
 var File_grpc_consensus_proto protoreflect.FileDescriptor
 
 const file_grpc_consensus_proto_rawDesc = "" +
 	"\n" +
-	"\x14grpc/consensus.proto\"'\n" +
-	"\aRequest\x12\x1c\n" +
-	"\ttimestamp\x18\x01 \x01(\x03R\ttimestamp\"%\n" +
-	"\x05Reply\x12\x1c\n" +
-	"\ttimestamp\x18\x01 \x01(\x03R\ttimestamp2%\n" +
+	"\x14grpc/consensus.proto\"7\n" +
+	"\aMessage\x12\x1c\n" +
+	"\ttimestamp\x18\x01 \x01(\x03R\ttimestamp\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\x03R\x02id\"#\n" +
+	"\x05Reply\x12\x1a\n" +
+	"\bisQueued\x18\x01 \x01(\bR\bisQueued\"\n" +
+	"\n" +
+	"\bReleased2G\n" +
 	"\x04Node\x12\x1d\n" +
-	"\aMessage\x12\b.Request\x1a\x06.Reply\"\x00B\rZ\v./consensusb\beditionsp\xe8\a"
+	"\aRequest\x12\b.Message\x1a\x06.Reply\"\x00\x12 \n" +
+	"\aRespond\x12\b.Message\x1a\t.Released\"\x00B\rZ\v./consensusb\beditionsp\xe8\a"
 
 var (
 	file_grpc_consensus_proto_rawDescOnce sync.Once
@@ -133,16 +181,19 @@ func file_grpc_consensus_proto_rawDescGZIP() []byte {
 	return file_grpc_consensus_proto_rawDescData
 }
 
-var file_grpc_consensus_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_grpc_consensus_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_grpc_consensus_proto_goTypes = []any{
-	(*Request)(nil), // 0: Request
-	(*Reply)(nil),   // 1: Reply
+	(*Message)(nil),  // 0: Message
+	(*Reply)(nil),    // 1: Reply
+	(*Released)(nil), // 2: Released
 }
 var file_grpc_consensus_proto_depIdxs = []int32{
-	0, // 0: Node.Message:input_type -> Request
-	1, // 1: Node.Message:output_type -> Reply
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
+	0, // 0: Node.Request:input_type -> Message
+	0, // 1: Node.Respond:input_type -> Message
+	1, // 2: Node.Request:output_type -> Reply
+	2, // 3: Node.Respond:output_type -> Released
+	2, // [2:4] is the sub-list for method output_type
+	0, // [0:2] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -159,7 +210,7 @@ func file_grpc_consensus_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_grpc_consensus_proto_rawDesc), len(file_grpc_consensus_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

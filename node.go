@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -14,11 +15,23 @@ import (
 	. "DistEx/grpc"
 )
 
-var LamportTime int64 = 0
+var Nodes []int64
+
+var LamportTime *int64
 
 var State eCriticalSystemState = RELEASED
 
-var Port uint64
+type eCriticalSystemState uint8
+
+const (
+	RELEASED eCriticalSystemState = iota
+	WANTED   eCriticalSystemState = iota
+	HELD     eCriticalSystemState = iota
+)
+
+var Port *int64
+
+var RequestQueue []int64
 
 type Server struct {
 	UnimplementedNodeServer
@@ -26,12 +39,24 @@ type Server struct {
 
 var logger *log.Logger
 
-func main() {
-	Port := ParseArguments(os.Args)
-	logFile := InitLogging()
-	defer ShutdownLogging(logFile)
+var wg sync.WaitGroup
 
-	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", Port))
+func main() {
+	Nodes := []int64{5000, 5001, 5002}
+	_ = Nodes
+
+	LamportTime = new(int64)
+	Port = ParseArguments(os.Args)
+	filename := fmt.Sprintf("log-%d.txt", *Port)
+	file, err := os.Create(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	prefix := fmt.Sprintf("Node %d: ", *Port)
+	logger = log.New(file, prefix, 0)
+	defer ShutdownLogging(file)
+
+	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", *Port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
@@ -56,7 +81,7 @@ func main() {
 // Otherwise, calls [AccessCriticalResource].
 func ReadUserInput(wait chan struct{}) {
 	reader := bufio.NewScanner(os.Stdin)
-	logger.Println("Node started. Enter messages to store in shared file:")
+	fmt.Printf("Node %d started. Enter messages to store in shared file:\n", *Port)
 	for {
 		reader.Scan()
 		if reader.Err() != nil {
@@ -81,11 +106,13 @@ func Serve(server *grpc.Server, lis net.Listener, wait chan struct{}) {
 		wait <- struct{}{}
 		logger.Fatalf("failed to serve: %v", err)
 	}
-	logger.Printf("Listening on %s.\n", lis.Addr())
+	logf("Listening on %s.\n", lis.Addr())
 }
 
-/** AccessCriticalResource appends the given text string to the file called "shared.txt". */
+// AccessCriticalResource appends the given text string to the file called "shared.txt". */
 func AccessCriticalResource(text string) {
+	enter()
+
 	file, err := os.OpenFile("shared.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		logger.Fatalf("failed to open file: %v", err)
@@ -97,49 +124,140 @@ func AccessCriticalResource(text string) {
 		}
 	}(file)
 
-	stringToWrite := fmt.Sprintf("%s: %s\n", time.Now().Format(time.DateTime), text)
+	stringToWrite := fmt.Sprintf("%s: T: %d; p:%d; %s\n",
+		time.Now().Format(time.DateTime),
+		*LamportTime,
+		*Port,
+		text)
 	_, err = file.WriteString(stringToWrite)
 	if err != nil {
 		logger.Fatalf("failed to write string: %v", err)
 	}
-	logger.Printf("Wrote to critical resource.\n")
+	logf("Wrote to critical resource.\n")
+	exit()
 }
 
-type eCriticalSystemState uint8
-
-const (
-	RELEASED eCriticalSystemState = iota
-	WANTED   eCriticalSystemState = iota
-	HELD     eCriticalSystemState = iota
-)
-
-// InitLogging creates the logging file and initialises the logger with the correct prefix.
-func InitLogging() *os.File {
-	filename := fmt.Sprintf("log-%d.txt", Port)
-	file, err := os.Create(filename)
-	if err != nil {
-		log.Fatal(err)
+// enter performs the necessary actions when attempting to gain access to the
+// critical section.
+func enter() {
+	*LamportTime += 1
+	State = WANTED
+	for _, node := range Nodes {
+		if node != *Port {
+			wg.Add(1) //increment waitgroup for the routines to finish themselves
+			go broadcast(node)
+		}
 	}
-	prefix := fmt.Sprintf("Node %d: ", Port)
-	logger = log.New(file, prefix, 0)
-	return file
+
+	wg.Wait() // added wait condition (meaning N-1 have been closed)
+	State = HELD
+}
+
+// broadcast sends a request-for-access to the given port.
+func broadcast(targetPort int64) {
+	var opts []grpc.DialOption
+	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	targetAddress := fmt.Sprintf("localhost:%d", targetPort)
+	conn, err := grpc.NewClient(targetAddress, opts...)
+	if err != nil {
+		logger.Fatalf("Failed to dial: %v", err)
+	}
+	defer func(conn *grpc.ClientConn) {
+		err = conn.Close()
+		if err != nil {
+			logger.Fatalf("Error closing connection:\n%v", err)
+		}
+	}(conn)
+	client := NewNodeClient(conn)
+	_, err = client.Request(context.Background(), &Message{
+		Timestamp: LamportTime,
+		Id:        Port,
+	})
+	// If the client did not exist, we decrement the wait group instead of waiting
+	// for a response that will never arrive.
+	if err != nil {
+		wg.Done()
+	}
 }
 
 // ShutdownLogging closes the file which backs the logger.
 func ShutdownLogging(writer *os.File) {
-	logger.Println("Server shut down.")
+	logf("Server shut down.\n")
 	_ = writer.Close()
 }
 
 // ParseArguments reads the command-line arguments and returns the port number specified
 // therein.
-func ParseArguments(args []string) (port uint64) {
+func ParseArguments(args []string) *int64 {
 	if len(args) != 2 {
 		log.Fatal("Usage: go run main.go <port>")
 	}
-	port, err := strconv.ParseUint(args[1], 10, 16)
+	port, err := strconv.ParseInt(args[1], 10, 16)
 	if err != nil {
 		log.Fatal(err)
 	}
-	return port
+	return &port
+}
+
+// Request is the RPC executed when the caller wants access to the critical area.
+func Request(msg *Message) *Reply {
+	isQueued := false
+	if State == HELD || (State == WANTED && *LamportTime < *msg.Timestamp) {
+		RequestQueue = append(RequestQueue, *msg.Id)
+		isQueued = true
+	}
+	if *msg.Timestamp > *LamportTime {
+		*LamportTime = *msg.Timestamp
+		*LamportTime += 1
+	}
+	return &Reply{
+		IsQueued: &isQueued,
+	}
+}
+
+// Respond is the RPC executed when the caller is finished in the critical area.
+func Respond(msg *Message) *Released {
+	wg.Done()
+	if *msg.Timestamp > *LamportTime {
+		*LamportTime = *msg.Timestamp
+	}
+	return &Released{}
+}
+
+// exit performs the necessary actions when leaving the critical section.
+func exit() {
+	State = RELEASED
+	for _, targetPort := range RequestQueue {
+		reply(targetPort)
+	}
+}
+
+// reply sends the individual response to a target node after this node has finished
+// inside the critical section.
+func reply(targetPort int64) {
+	var opts []grpc.DialOption
+	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	targetAddress := fmt.Sprintf("localhost:%d", targetPort)
+	conn, err := grpc.NewClient(targetAddress, opts...)
+	if err != nil {
+		logger.Fatalf("Failed to dial: %v", err)
+	}
+	defer func(conn *grpc.ClientConn) {
+		err = conn.Close()
+		if err != nil {
+			logger.Fatalf("Error closing connection:\n%v", err)
+		}
+	}(conn)
+	client := NewNodeClient(conn)
+	_, err = client.Respond(context.Background(), &Message{
+		Timestamp: LamportTime,
+		Id:        Port,
+	})
+}
+
+// logf writes a message to the log file.
+func logf(format string, v ...any) {
+	prefix := fmt.Sprintf("Node %d. Time: %d. ", *Port, *LamportTime)
+	logger.SetPrefix(prefix)
+	logger.Printf(format, v...)
 }

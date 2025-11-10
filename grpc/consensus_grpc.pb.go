@@ -19,14 +19,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Node_Message_FullMethodName = "/Node/Message"
+	Node_Request_FullMethodName = "/Node/Request"
+	Node_Respond_FullMethodName = "/Node/Respond"
 )
 
 // NodeClient is the client API for Node service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type NodeClient interface {
-	Message(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Reply, error)
+	Request(ctx context.Context, in *Message, opts ...grpc.CallOption) (*Reply, error)
+	Respond(ctx context.Context, in *Message, opts ...grpc.CallOption) (*Released, error)
 }
 
 type nodeClient struct {
@@ -37,10 +39,20 @@ func NewNodeClient(cc grpc.ClientConnInterface) NodeClient {
 	return &nodeClient{cc}
 }
 
-func (c *nodeClient) Message(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Reply, error) {
+func (c *nodeClient) Request(ctx context.Context, in *Message, opts ...grpc.CallOption) (*Reply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Reply)
-	err := c.cc.Invoke(ctx, Node_Message_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, Node_Request_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *nodeClient) Respond(ctx context.Context, in *Message, opts ...grpc.CallOption) (*Released, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Released)
+	err := c.cc.Invoke(ctx, Node_Respond_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +63,8 @@ func (c *nodeClient) Message(ctx context.Context, in *Request, opts ...grpc.Call
 // All implementations must embed UnimplementedNodeServer
 // for forward compatibility.
 type NodeServer interface {
-	Message(context.Context, *Request) (*Reply, error)
+	Request(context.Context, *Message) (*Reply, error)
+	Respond(context.Context, *Message) (*Released, error)
 	mustEmbedUnimplementedNodeServer()
 }
 
@@ -62,8 +75,11 @@ type NodeServer interface {
 // pointer dereference when methods are called.
 type UnimplementedNodeServer struct{}
 
-func (UnimplementedNodeServer) Message(context.Context, *Request) (*Reply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Message not implemented")
+func (UnimplementedNodeServer) Request(context.Context, *Message) (*Reply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Request not implemented")
+}
+func (UnimplementedNodeServer) Respond(context.Context, *Message) (*Released, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Respond not implemented")
 }
 func (UnimplementedNodeServer) mustEmbedUnimplementedNodeServer() {}
 func (UnimplementedNodeServer) testEmbeddedByValue()              {}
@@ -86,20 +102,38 @@ func RegisterNodeServer(s grpc.ServiceRegistrar, srv NodeServer) {
 	s.RegisterService(&Node_ServiceDesc, srv)
 }
 
-func _Node_Message_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Request)
+func _Node_Request_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Message)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(NodeServer).Message(ctx, in)
+		return srv.(NodeServer).Request(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Node_Message_FullMethodName,
+		FullMethod: Node_Request_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NodeServer).Message(ctx, req.(*Request))
+		return srv.(NodeServer).Request(ctx, req.(*Message))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Node_Respond_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Message)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NodeServer).Respond(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Node_Respond_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NodeServer).Respond(ctx, req.(*Message))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -112,8 +146,12 @@ var Node_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*NodeServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Message",
-			Handler:    _Node_Message_Handler,
+			MethodName: "Request",
+			Handler:    _Node_Request_Handler,
+		},
+		{
+			MethodName: "Respond",
+			Handler:    _Node_Respond_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

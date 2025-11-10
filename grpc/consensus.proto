@@ -3,13 +3,17 @@ edition = "2023";
 option go_package = "./consensus";
 
 service Node {
-  rpc Message(Request) returns (Reply) {}
+  rpc Request(Message) returns (Reply) {}
+  rpc Respond(Message) returns (Released) {}
 }
 
-message Request {
+message Message {
   int64 timestamp = 1;
+  int64 id = 2;
 }
 
 message Reply {
-  int64 timestamp = 1;
+  bool isQueued = 1;
 }
+
+message Released {}
