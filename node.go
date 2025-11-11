@@ -197,11 +197,11 @@ func (s *Server) ShutdownLogging(writer *os.File) {
 // therein.
 func ParseArguments(args []string) *int64 {
 	if len(args) != 2 {
-		log.Fatal("Usage: go run main.go <port>")
+		log.Fatal("Wrong number of arguments.\nUsage:\n\tgo run . <port>\n\t./node <port>")
 	}
 	port, err := strconv.ParseInt(args[1], 10, 16)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Couldn't parse argument as a number.\nUsage:\n\tgo run . <port>\n\t./node <port>")
 	}
 	return &port
 }
