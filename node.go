@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	. "DistEx/grpc"
+	. "DistReplication/grpc"
 )
 
 type eCriticalSystemState uint8

@@ -1,4 +1,4 @@
-module DistEx
+module DistReplication
 
 go 1.25
 
