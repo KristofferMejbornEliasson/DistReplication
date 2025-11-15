@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	. "DistReplication/grpc"
@@ -14,13 +15,15 @@ import (
 )
 
 type Client struct {
-	pid         int64
-	logger      *log.Logger
-	LamportTime int64
+	pid         int64       // Client's process ID.
+	logger      *log.Logger // Instance used for logging.
+	LamportTime int64       // Local Lamport timestamp.
+	Port        uint16      // The port dialed by this client.
 }
 
 func main() {
 	c := Client{pid: int64(os.Getpid())}
+	c.Port = parseArguments()
 
 	filename := fmt.Sprintf("log-%d.txt", c.pid)
 	file, err := os.Create(filename)
@@ -33,7 +36,7 @@ func main() {
 
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	targetAddress := fmt.Sprintf("localhost:%d", 5000)
+	targetAddress := fmt.Sprintf("localhost:%d", c.Port)
 	conn, err := grpc.NewClient(targetAddress, opts...)
 	if err != nil {
 		c.logger.Fatalf("Failed to dial: %v", err)
@@ -67,4 +70,15 @@ func (c *Client) logf(format string, v ...any) {
 	} else {
 		c.logger.Print(text)
 	}
+}
+
+func parseArguments() (port uint16) {
+	if len(os.Args) != 2 {
+		log.Fatalf("Incorrect number of arguments.\nUsage: %s <port>\n", os.Args[0])
+	}
+	arg, err := strconv.ParseUint(os.Args[1], 10, 16)
+	if err != nil {
+		log.Fatalf("Invalid port number.\nUsage: %s <port>\n", os.Args[0])
+	}
+	return uint16(arg)
 }
