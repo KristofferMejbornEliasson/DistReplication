@@ -9,16 +9,17 @@ import (
 	"strings"
 
 	. "DistReplication/grpc"
+	"DistReplication/time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Client struct {
-	pid         int64       // Client's process ID.
-	logger      *log.Logger // Instance used for logging.
-	LamportTime int64       // Local Lamport timestamp.
-	Port        uint16      // The port dialed by this client.
+	pid       int64         // Client's process ID.
+	logger    *log.Logger   // Instance used for logging.
+	Timestamp *time.Lamport // Local Lamport timestamp.
+	Port      uint16        // The port dialed by this client.
 }
 
 func main() {
@@ -48,8 +49,9 @@ func main() {
 		}
 	}(conn)
 	client := NewNodeClient(conn)
+	timestamp := c.Timestamp.Now()
 	_, err = client.Request(context.Background(), &Message{
-		Timestamp: &c.LamportTime,
+		Timestamp: &timestamp,
 		Id:        &c.pid,
 	})
 }
@@ -62,7 +64,7 @@ func (c *Client) ShutdownLogging(writer *os.File) {
 
 // logf writes a message to the log file.
 func (c *Client) logf(format string, v ...any) {
-	prefix := fmt.Sprintf("Node %d. Time: %d. ", c.pid, c.LamportTime)
+	prefix := fmt.Sprintf("Node %d. Time: %d. ", c.pid, c.Timestamp)
 	c.logger.SetPrefix(prefix)
 	text := fmt.Sprintf(format, v...)
 	if !(strings.HasSuffix(format, "\n") || strings.HasSuffix(format, "\r")) {

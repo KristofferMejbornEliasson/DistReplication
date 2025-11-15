@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	. "DistReplication/grpc"
+	. "DistReplication/time"
 )
 
 type eCriticalSystemState uint8
@@ -30,9 +31,8 @@ type Server struct {
 	UnimplementedNodeServer
 	logger       *log.Logger
 	wg           *sync.WaitGroup
-	LamportTime  *int64
+	Timestamp    *Lamport
 	Port         *int64
-	TimeLock     *sync.Mutex
 	Nodes        []int64
 	State        eCriticalSystemState
 	RequestQueue []int64
@@ -40,10 +40,9 @@ type Server struct {
 
 func main() {
 	Service := Server{
-		LamportTime:  new(int64),
+		Timestamp:    new(Lamport),
 		Port:         ParseArguments(os.Args),
 		wg:           &sync.WaitGroup{},
-		TimeLock:     new(sync.Mutex),
 		State:        RELEASED,
 		RequestQueue: make([]int64, 0),
 	}
@@ -128,7 +127,7 @@ func (s *Server) AccessCriticalResource(text string) {
 
 	stringToWrite := fmt.Sprintf("%s: T: %d; p:%d; %s\n",
 		time.Now().Format(time.DateTime),
-		*s.LamportTime,
+		*s.Timestamp,
 		*s.Port,
 		text)
 	_, err = file.WriteString(stringToWrite)
@@ -142,7 +141,7 @@ func (s *Server) AccessCriticalResource(text string) {
 // enter performs the necessary actions when attempting to gain access to the
 // critical section.
 func (s *Server) enter() {
-	s.IncrementTime()
+	s.Timestamp.Increment()
 	s.State = WANTED
 	s.logf("Setting state to WANTED.")
 	s.logf("Broadcasting to all other nodes.")
@@ -173,8 +172,9 @@ func (s *Server) broadcast(targetPort int64) {
 		}
 	}(conn)
 	client := NewNodeClient(conn)
+	timestamp := s.Timestamp.Now()
 	_, err = client.Request(context.Background(), &Message{
-		Timestamp: s.LamportTime,
+		Timestamp: &timestamp,
 		Id:        s.Port,
 	})
 	// If the client did not exist, we decrement the wait group instead of waiting
@@ -210,11 +210,11 @@ func ParseArguments(args []string) *int64 {
 func (s *Server) Request(_ context.Context, msg *Message) (*Reply, error) {
 	isBusy := false
 	s.logf("Received critical area access request from node %d.", msg.GetId())
-	if s.State == HELD || (s.State == WANTED && *s.LamportTime < *msg.Timestamp) {
+	if s.State == HELD || (s.State == WANTED && s.Timestamp.Now() < *msg.Timestamp) {
 		isBusy = true
 	}
-	s.UpdateTime(msg.Timestamp)
-	s.IncrementTime()
+	s.Timestamp.UpdateTime(*msg.Timestamp)
+	s.Timestamp.Increment()
 	if isBusy {
 		s.logf("Adding request to queue.")
 		s.RequestQueue = append(s.RequestQueue, msg.GetId())
@@ -231,8 +231,8 @@ func (s *Server) Request(_ context.Context, msg *Message) (*Reply, error) {
 // and found this node in its queue.
 func (s *Server) Respond(_ context.Context, msg *Message) (*Released, error) {
 	s.wg.Done() // Decrements the wait-group's counter.
-	s.UpdateTime(msg.Timestamp)
-	s.IncrementTime()
+	s.Timestamp.UpdateTime(*msg.Timestamp)
+	s.Timestamp.Increment()
 	s.logf("Received reply to critical area access request from node %d.", msg.GetId())
 	return &Released{}, nil
 }
@@ -263,15 +263,16 @@ func (s *Server) reply(targetPort int64) {
 		}
 	}(conn)
 	client := NewNodeClient(conn)
+	timestamp := s.Timestamp.Now()
 	_, err = client.Respond(context.Background(), &Message{
-		Timestamp: s.LamportTime,
+		Timestamp: &timestamp,
 		Id:        s.Port,
 	})
 }
 
 // logf writes a message to the log file.
 func (s *Server) logf(format string, v ...any) {
-	prefix := fmt.Sprintf("Node %d. Time: %d. ", *s.Port, *s.LamportTime)
+	prefix := fmt.Sprintf("Node %d. Time: %s. ", *s.Port, s.Timestamp)
 	s.logger.SetPrefix(prefix)
 	text := fmt.Sprintf(format, v...)
 	if !(strings.HasSuffix(format, "\n") || strings.HasSuffix(format, "\r")) {
@@ -297,18 +298,4 @@ func setupOtherNodeList(port int64) []int64 {
 		}
 	}
 	return nodes
-}
-
-func (s *Server) IncrementTime() {
-	s.TimeLock.Lock()
-	defer s.TimeLock.Unlock()
-	*s.LamportTime += 1
-}
-
-func (s *Server) UpdateTime(other *int64) {
-	s.TimeLock.Lock()
-	defer s.TimeLock.Unlock()
-	if *s.LamportTime < *other {
-		*s.LamportTime = *other
-	}
 }
