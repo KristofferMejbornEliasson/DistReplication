@@ -10,12 +10,14 @@ type Lamport struct {
 	lock      *sync.Mutex
 }
 
+// Now returns the current timestamp value.
 func (l *Lamport) Now() uint64 {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	return l.timestamp
 }
 
+// Increment increases the timestamp value by 1.
 func (l *Lamport) Increment() uint64 {
 	l.lock.Lock()
 	defer l.lock.Unlock()
@@ -23,33 +25,29 @@ func (l *Lamport) Increment() uint64 {
 	return l.timestamp
 }
 
+// Update sets this timestamp's value to be equal to the greater of itself and
+// the input Lamport time's value.
 func (l *Lamport) Update(other *Lamport) uint64 {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
 	if l != other && other != nil {
-		otherTime := other.Now()
-		if l.timestamp < otherTime {
-			l.timestamp = otherTime
-		}
+		l.timestamp = max(l.timestamp, other.Now())
 	}
 
 	return l.timestamp
 }
 
+// UpdateTime sets this timestamp's value to be equal to the greater of itself
+// and the input value.
 func (l *Lamport) UpdateTime(other uint64) uint64 {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
-	if l.timestamp < other {
-		l.timestamp = other
-	}
-
+	l.timestamp = max(l.timestamp, other)
 	return l.timestamp
 }
 
 func (l *Lamport) String() string {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	return strconv.FormatUint(l.timestamp, 10)
+	return strconv.FormatUint(l.Now(), 10)
 }
