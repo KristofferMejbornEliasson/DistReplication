@@ -36,6 +36,7 @@ type Server struct {
 	Nodes        []int64
 	State        eCriticalSystemState
 	RequestQueue []int64
+	auction      *Auction
 }
 
 func main() {
