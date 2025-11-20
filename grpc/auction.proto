@@ -21,17 +21,18 @@ message BidResponse {
 }
 
 enum eAck {
-  Fail = 0;
-  Success = 1;
-  Exception = 2;
+  Exception = 0;
+  Fail = 1;
+  Success = 2;
 }
 
 message Outcome {
   int64 senderId = 1;
   uint64 timestamp = 2;
-  bool isAuctionCompleted = 3;
-  uint64 leadingBid = 4;
-  int64 leadingID = 5;
+  uint64 leadingBid = 3;
+  int64 leadingID = 4;
+  int64 auctionStartTime = 5;
+  int64 auctionEndTime = 6;
 }
 
 message void {

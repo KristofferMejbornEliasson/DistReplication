@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -40,34 +39,35 @@ type Server struct {
 }
 
 func main() {
-	Service := Server{
+	server := Server{
 		Timestamp:    new(Lamport),
 		Port:         ParseArguments(os.Args),
 		wg:           &sync.WaitGroup{},
 		State:        RELEASED,
 		RequestQueue: make([]int64, 0),
 	}
-	Service.Nodes = setupOtherNodeList(*Service.Port)
+	server.Nodes = setupOtherNodeList(*server.Port)
 
 	file, err := os.Create("log.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
-	prefix := fmt.Sprintf("Node %d: ", *Service.Port)
-	Service.logger = log.New(file, prefix, 0)
-	defer Service.ShutdownLogging(file)
+	prefix := fmt.Sprintf("Node %d: ", *server.Port)
+	server.logger = log.New(file, prefix, 0)
+	defer server.ShutdownLogging(file)
 
-	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", *Service.Port))
+	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", *server.Port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
-	RegisterNodeServer(grpcServer, &Service)
+	RegisterNodeServer(grpcServer, &server)
 
+	server.auction = StartNewAuction(0)
 	wait := make(chan struct{})
-	go Service.Serve(grpcServer, lis, wait)
-	go Service.ReadUserInput(wait)
+	go server.Serve(grpcServer, lis, wait)
+	go server.ReadUserInput(wait)
 	for {
 		select {
 		case <-wait:
@@ -77,8 +77,7 @@ func main() {
 }
 
 // ReadUserInput runs constantly, reading the standard input.
-// Breaks out when the user types "quit" or "exit", and ignores empty lines.
-// Otherwise, calls [AccessCriticalResource].
+// Breaks out when the user types "quit" or "exit".
 func (s *Server) ReadUserInput(wait chan struct{}) {
 	reader := bufio.NewScanner(os.Stdin)
 	fmt.Printf("Node %d started. Enter messages to store in shared file:\n", *s.Port)
@@ -96,7 +95,6 @@ func (s *Server) ReadUserInput(wait chan struct{}) {
 		if text == "" {
 			continue
 		}
-		s.AccessCriticalResource(text)
 	}
 }
 
@@ -108,83 +106,6 @@ func (s *Server) Serve(server *grpc.Server, lis net.Listener, wait chan struct{}
 		s.logger.Fatalf("failed to serve: %v", err)
 	}
 	s.logf("Listening on %s.\n", lis.Addr())
-}
-
-// AccessCriticalResource appends the given text string to the file called "shared.txt". */
-func (s *Server) AccessCriticalResource(text string) {
-	s.enter()
-
-	file, err := os.OpenFile("shared.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		s.logger.Fatalf("failed to open file: %v", err)
-	}
-	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
-			s.logger.Fatalf("failed to close file: %v", err)
-		}
-	}(file)
-
-	stringToWrite := fmt.Sprintf("%s: T: %d; p:%d; %s\n",
-		time.Now().Format(time.DateTime),
-		*s.Timestamp,
-		*s.Port,
-		text)
-	_, err = file.WriteString(stringToWrite)
-	if err != nil {
-		s.logger.Fatalf("failed to write string: %v", err)
-	}
-	s.logf("Wrote to critical resource: \"%s\"\n", text)
-	s.exit()
-}
-
-// enter performs the necessary actions when attempting to gain access to the
-// critical section.
-func (s *Server) enter() {
-	s.Timestamp.Increment()
-	s.State = WANTED
-	s.logf("Setting state to WANTED.")
-	s.logf("Broadcasting to all other nodes.")
-	for _, node := range s.Nodes {
-		s.logf("Broadcast to node %d\n", node)
-		s.wg.Add(1) // Increments the wait-group's counter.
-		go s.broadcast(node)
-	}
-
-	s.wg.Wait() // Blocks until the wait-group's counter is 0.
-	s.State = HELD
-	s.logf("Received N-1 replies. Setting state to HELD.")
-}
-
-// broadcast sends a request-for-access to the given port.
-func (s *Server) broadcast(targetPort int64) {
-	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	targetAddress := fmt.Sprintf("localhost:%d", targetPort)
-	conn, err := grpc.NewClient(targetAddress, opts...)
-	if err != nil {
-		s.logger.Fatalf("Failed to dial: %v", err)
-	}
-	defer func(conn *grpc.ClientConn) {
-		err = conn.Close()
-		if err != nil {
-			s.logger.Fatalf("Error closing connection:\n%v", err)
-		}
-	}(conn)
-	/*client := NewNodeClient(conn)
-	timestamp := s.Timestamp.Now()
-	_, err = client.Request(context.Background(), &Message{
-		Timestamp: &timestamp,
-		Id:        s.Port,
-	})
-	// If the client did not exist, we decrement the wait group instead of waiting
-	// for a response that will never arrive.
-	if err != nil {
-		s.wg.Done() // Decrements the wait-group's counter.
-		s.logf("Failed to broadcast to node %d. Skipping it.", targetPort)
-	} else {
-		s.logf("Broadcasted to node %d.", targetPort)
-	}*/
 }
 
 // ShutdownLogging closes the file which backs the logger.
@@ -206,33 +127,32 @@ func ParseArguments(args []string) *int64 {
 	return &port
 }
 
-// Request is the RPC executed when the caller wants access to the critical area.
-func (s *Server) Request(_ context.Context, msg *Void) (*Void, error) {
-	isBusy := false
-	s.logf("Received critical area access request from node %d.", msg.GetSenderId())
-	if s.State == HELD || (s.State == WANTED && s.Timestamp.Now() < *msg.Timestamp) {
-		isBusy = true
-	}
+// Bid is the RPC executed when the caller wants access to the critical area.
+func (s *Server) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
+	s.logf("Received bid request from client %d.", msg.GetSenderId())
 	s.Timestamp.UpdateTime(*msg.Timestamp)
 	s.Timestamp.Increment()
-	if isBusy {
-		s.logf("Adding request to queue.")
-		s.RequestQueue = append(s.RequestQueue, msg.GetSenderId())
-	} else {
-		s.logf("Replying immediately to request.")
-		s.reply(msg.GetSenderId())
+	timestamp := s.Timestamp.Now()
+	state := EAck_Exception
+	if s.auction != nil && s.auction.IsActive() {
+		state = EAck_Fail
+		return &BidResponse{
+			SenderId:  s.Port,
+			Timestamp: &timestamp,
+			Ack:       &state,
+		}, nil
 	}
-	return s.GenerateVoidMessage(), nil
+	return nil, nil
 }
 
-// Respond is the RPC executed when the caller is finished in the critical area,
+// Result is the RPC executed when the caller is finished in the critical area,
 // and found this node in its queue.
-func (s *Server) Respond(_ context.Context, msg *Void) (*Void, error) {
+func (s *Server) Result(_ context.Context, msg *Void) (*Outcome, error) {
 	s.wg.Done() // Decrements the wait-group's counter.
 	s.Timestamp.UpdateTime(*msg.Timestamp)
 	s.Timestamp.Increment()
 	s.logf("Received reply to critical area access request from node %d.", msg.GetSenderId())
-	return s.GenerateVoidMessage(), nil
+	return nil, nil
 }
 
 // exit performs the necessary actions when leaving the critical section.
@@ -262,7 +182,7 @@ func (s *Server) reply(targetPort int64) {
 	}(conn)
 	/*client := NewNodeClient(conn)
 	timestamp := s.Timestamp.Now()
-	_, err = client.Respond(context.Background(), &Message{
+	_, err = client.Result(context.Background(), &Message{
 		Timestamp: &timestamp,
 		Id:        s.Port,
 	})*/

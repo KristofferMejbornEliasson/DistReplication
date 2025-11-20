@@ -24,22 +24,22 @@ const (
 type EAck int32
 
 const (
-	EAck_Fail      EAck = 0
-	EAck_Success   EAck = 1
-	EAck_Exception EAck = 2
+	EAck_Exception EAck = 0
+	EAck_Fail      EAck = 1
+	EAck_Success   EAck = 2
 )
 
 // Enum value maps for EAck.
 var (
 	EAck_name = map[int32]string{
-		0: "Fail",
-		1: "Success",
-		2: "Exception",
+		0: "Exception",
+		1: "Fail",
+		2: "Success",
 	}
 	EAck_value = map[string]int32{
-		"Fail":      0,
-		"Success":   1,
-		"Exception": 2,
+		"Exception": 0,
+		"Fail":      1,
+		"Success":   2,
 	}
 )
 
@@ -187,18 +187,19 @@ func (x *BidResponse) GetAck() EAck {
 	if x != nil && x.Ack != nil {
 		return *x.Ack
 	}
-	return EAck_Fail
+	return EAck_Exception
 }
 
 type Outcome struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
-	SenderId           *int64                 `protobuf:"varint,1,opt,name=senderId" json:"senderId,omitempty"`
-	Timestamp          *uint64                `protobuf:"varint,2,opt,name=timestamp" json:"timestamp,omitempty"`
-	IsAuctionCompleted *bool                  `protobuf:"varint,3,opt,name=isAuctionCompleted" json:"isAuctionCompleted,omitempty"`
-	LeadingBid         *uint64                `protobuf:"varint,4,opt,name=leadingBid" json:"leadingBid,omitempty"`
-	LeadingID          *int64                 `protobuf:"varint,5,opt,name=leadingID" json:"leadingID,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	SenderId         *int64                 `protobuf:"varint,1,opt,name=senderId" json:"senderId,omitempty"`
+	Timestamp        *uint64                `protobuf:"varint,2,opt,name=timestamp" json:"timestamp,omitempty"`
+	LeadingBid       *uint64                `protobuf:"varint,3,opt,name=leadingBid" json:"leadingBid,omitempty"`
+	LeadingID        *int64                 `protobuf:"varint,4,opt,name=leadingID" json:"leadingID,omitempty"`
+	AuctionStartTime *int64                 `protobuf:"varint,5,opt,name=auctionStartTime" json:"auctionStartTime,omitempty"`
+	AuctionEndTime   *int64                 `protobuf:"varint,6,opt,name=auctionEndTime" json:"auctionEndTime,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *Outcome) Reset() {
@@ -245,13 +246,6 @@ func (x *Outcome) GetTimestamp() uint64 {
 	return 0
 }
 
-func (x *Outcome) GetIsAuctionCompleted() bool {
-	if x != nil && x.IsAuctionCompleted != nil {
-		return *x.IsAuctionCompleted
-	}
-	return false
-}
-
 func (x *Outcome) GetLeadingBid() uint64 {
 	if x != nil && x.LeadingBid != nil {
 		return *x.LeadingBid
@@ -262,6 +256,20 @@ func (x *Outcome) GetLeadingBid() uint64 {
 func (x *Outcome) GetLeadingID() int64 {
 	if x != nil && x.LeadingID != nil {
 		return *x.LeadingID
+	}
+	return 0
+}
+
+func (x *Outcome) GetAuctionStartTime() int64 {
+	if x != nil && x.AuctionStartTime != nil {
+		return *x.AuctionStartTime
+	}
+	return 0
+}
+
+func (x *Outcome) GetAuctionEndTime() int64 {
+	if x != nil && x.AuctionEndTime != nil {
+		return *x.AuctionEndTime
 	}
 	return 0
 }
@@ -331,22 +339,23 @@ const file_grpc_auction_proto_rawDesc = "" +
 	"\vBidResponse\x12\x1a\n" +
 	"\bsenderId\x18\x01 \x01(\x03R\bsenderId\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x04R\ttimestamp\x12\x17\n" +
-	"\x03ack\x18\x03 \x01(\x0e2\x05.eAckR\x03ack\"\xb1\x01\n" +
+	"\x03ack\x18\x03 \x01(\x0e2\x05.eAckR\x03ack\"\xd5\x01\n" +
 	"\aOutcome\x12\x1a\n" +
 	"\bsenderId\x18\x01 \x01(\x03R\bsenderId\x12\x1c\n" +
-	"\ttimestamp\x18\x02 \x01(\x04R\ttimestamp\x12.\n" +
-	"\x12isAuctionCompleted\x18\x03 \x01(\bR\x12isAuctionCompleted\x12\x1e\n" +
+	"\ttimestamp\x18\x02 \x01(\x04R\ttimestamp\x12\x1e\n" +
 	"\n" +
-	"leadingBid\x18\x04 \x01(\x04R\n" +
+	"leadingBid\x18\x03 \x01(\x04R\n" +
 	"leadingBid\x12\x1c\n" +
-	"\tleadingID\x18\x05 \x01(\x03R\tleadingID\"@\n" +
+	"\tleadingID\x18\x04 \x01(\x03R\tleadingID\x12*\n" +
+	"\x10auctionStartTime\x18\x05 \x01(\x03R\x10auctionStartTime\x12&\n" +
+	"\x0eauctionEndTime\x18\x06 \x01(\x03R\x0eauctionEndTime\"@\n" +
 	"\x04void\x12\x1a\n" +
 	"\bsenderId\x18\x01 \x01(\x03R\bsenderId\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x04R\ttimestamp*,\n" +
-	"\x04eAck\x12\b\n" +
-	"\x04Fail\x10\x00\x12\v\n" +
-	"\aSuccess\x10\x01\x12\r\n" +
-	"\tException\x10\x022_\n" +
+	"\x04eAck\x12\r\n" +
+	"\tException\x10\x00\x12\b\n" +
+	"\x04Fail\x10\x01\x12\v\n" +
+	"\aSuccess\x10\x022_\n" +
 	"\x04Node\x12\"\n" +
 	"\x03Bid\x12\v.BidRequest\x1a\f.BidResponse\"\x00\x12\x1b\n" +
 	"\x06Result\x12\x05.void\x1a\b.Outcome\"\x00\x12\x16\n" +
