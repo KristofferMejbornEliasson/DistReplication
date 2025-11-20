@@ -49,9 +49,11 @@ func main() {
 	}(conn)
 	client := NewNodeClient(conn)
 	timestamp := c.Timestamp.Now()
-	_, err = client.Request(context.Background(), &Message{
+	var amount uint64 = 100
+	_, err = client.Bid(context.Background(), &BidRequest{
+		SenderId:  &c.pid,
 		Timestamp: &timestamp,
-		Id:        &c.pid,
+		Amount:    &amount,
 	})
 }
 

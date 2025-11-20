@@ -170,7 +170,7 @@ func (s *Server) broadcast(targetPort int64) {
 			s.logger.Fatalf("Error closing connection:\n%v", err)
 		}
 	}(conn)
-	client := NewNodeClient(conn)
+	/*client := NewNodeClient(conn)
 	timestamp := s.Timestamp.Now()
 	_, err = client.Request(context.Background(), &Message{
 		Timestamp: &timestamp,
@@ -183,7 +183,7 @@ func (s *Server) broadcast(targetPort int64) {
 		s.logf("Failed to broadcast to node %d. Skipping it.", targetPort)
 	} else {
 		s.logf("Broadcasted to node %d.", targetPort)
-	}
+	}*/
 }
 
 // ShutdownLogging closes the file which backs the logger.
@@ -206,9 +206,9 @@ func ParseArguments(args []string) *int64 {
 }
 
 // Request is the RPC executed when the caller wants access to the critical area.
-func (s *Server) Request(_ context.Context, msg *Message) (*Reply, error) {
+func (s *Server) Request(_ context.Context, msg *Void) (*Void, error) {
 	isBusy := false
-	s.logf("Received critical area access request from node %d.", msg.GetId())
+	s.logf("Received critical area access request from node %d.", msg.GetSenderId())
 	if s.State == HELD || (s.State == WANTED && s.Timestamp.Now() < *msg.Timestamp) {
 		isBusy = true
 	}
@@ -216,24 +216,22 @@ func (s *Server) Request(_ context.Context, msg *Message) (*Reply, error) {
 	s.Timestamp.Increment()
 	if isBusy {
 		s.logf("Adding request to queue.")
-		s.RequestQueue = append(s.RequestQueue, msg.GetId())
+		s.RequestQueue = append(s.RequestQueue, msg.GetSenderId())
 	} else {
 		s.logf("Replying immediately to request.")
-		s.reply(msg.GetId())
+		s.reply(msg.GetSenderId())
 	}
-	return &Reply{
-		IsQueued: &isBusy,
-	}, nil
+	return s.GenerateVoidMessage(), nil
 }
 
 // Respond is the RPC executed when the caller is finished in the critical area,
 // and found this node in its queue.
-func (s *Server) Respond(_ context.Context, msg *Message) (*Released, error) {
+func (s *Server) Respond(_ context.Context, msg *Void) (*Void, error) {
 	s.wg.Done() // Decrements the wait-group's counter.
 	s.Timestamp.UpdateTime(*msg.Timestamp)
 	s.Timestamp.Increment()
-	s.logf("Received reply to critical area access request from node %d.", msg.GetId())
-	return &Released{}, nil
+	s.logf("Received reply to critical area access request from node %d.", msg.GetSenderId())
+	return s.GenerateVoidMessage(), nil
 }
 
 // exit performs the necessary actions when leaving the critical section.
@@ -261,12 +259,12 @@ func (s *Server) reply(targetPort int64) {
 			s.logger.Fatalf("Error closing connection:\n%v", err)
 		}
 	}(conn)
-	client := NewNodeClient(conn)
+	/*client := NewNodeClient(conn)
 	timestamp := s.Timestamp.Now()
 	_, err = client.Respond(context.Background(), &Message{
 		Timestamp: &timestamp,
 		Id:        s.Port,
-	})
+	})*/
 }
 
 // logf writes a message to the log file.
@@ -297,4 +295,12 @@ func setupOtherNodeList(port int64) []int64 {
 		}
 	}
 	return nodes
+}
+
+func (s *Server) GenerateVoidMessage() *Void {
+	timestamp := s.Timestamp.Now()
+	return &Void{
+		SenderId:  s.Port,
+		Timestamp: &timestamp,
+	}
 }

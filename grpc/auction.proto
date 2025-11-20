@@ -1,0 +1,40 @@
+edition = "2023";
+
+option go_package = "./auction";
+
+service Node {
+  rpc Bid(BidRequest) returns (BidResponse) {}
+  rpc Result(void) returns (Outcome) {}
+  rpc Ping(void) returns (void) {}
+}
+
+message BidRequest {
+  int64 senderId = 1;
+  uint64 timestamp = 2;
+  uint64 amount = 3;
+}
+
+message BidResponse {
+  int64 senderId = 1;
+  uint64 timestamp = 2;
+  eAck ack = 3;
+}
+
+enum eAck {
+  Fail = 0;
+  Success = 1;
+  Exception = 2;
+}
+
+message Outcome {
+  int64 senderId = 1;
+  uint64 timestamp = 2;
+  bool isAuctionCompleted = 3;
+  uint64 leadingBid = 4;
+  int64 leadingID = 5;
+}
+
+message void {
+  int64 senderId = 1;
+  uint64 timestamp = 2;
+}
