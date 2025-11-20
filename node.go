@@ -48,8 +48,7 @@ func main() {
 	}
 	Service.Nodes = setupOtherNodeList(*Service.Port)
 
-	filename := fmt.Sprintf("log-%d.txt", *Service.Port)
-	file, err := os.Create(filename)
+	file, err := os.Create("log.txt")
 	if err != nil {
 		log.Fatal(err)
 	}

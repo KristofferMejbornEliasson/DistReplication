@@ -26,8 +26,7 @@ func main() {
 	c := Client{pid: int64(os.Getpid())}
 	c.Port = parseArguments()
 
-	filename := fmt.Sprintf("log-%d.txt", c.pid)
-	file, err := os.Create(filename)
+	file, err := os.Create("log.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
