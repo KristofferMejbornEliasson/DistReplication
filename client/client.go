@@ -15,16 +15,16 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+const FrontendPort = 4999
+
 type Client struct {
 	pid       int64         // Client's process ID.
 	logger    *log.Logger   // Instance used for logging.
 	Timestamp *time.Lamport // Local Lamport timestamp.
-	Port      uint16        // The port dialed by this client.
 }
 
 func main() {
 	c := Client{pid: int64(os.Getpid())}
-	c.Port = parseArguments()
 
 	file, err := os.Create("log.txt")
 	if err != nil {
@@ -36,7 +36,7 @@ func main() {
 
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	targetAddress := fmt.Sprintf("localhost:%d", c.Port)
+	targetAddress := fmt.Sprintf("localhost:%d", FrontendPort)
 	conn, err := grpc.NewClient(targetAddress, opts...)
 	if err != nil {
 		c.logger.Fatalf("Failed to dial: %v", err)
@@ -49,12 +49,40 @@ func main() {
 	}(conn)
 	client := NewNodeClient(conn)
 	timestamp := c.Timestamp.Now()
-	var amount uint64 = 100
-	_, err = client.Bid(context.Background(), &BidRequest{
-		SenderId:  &c.pid,
-		Timestamp: &timestamp,
-		Amount:    &amount,
-	})
+
+	arg := parseArguments()
+	if arg == nil {
+		c.logger.Fatalln("Could not parse arguments.")
+	}
+	if arg.command == "bid" {
+		response, err := client.Bid(context.Background(), &BidRequest{
+			SenderID:  &c.pid,
+			Timestamp: &timestamp,
+			Amount:    &arg.amount,
+		})
+		if err != nil {
+			c.logger.Fatal(err)
+		}
+		switch response.GetAck() {
+		case EAck_Success:
+			fmt.Printf("Bid successful. You are highest bidder with %d,-\n", arg.amount)
+		case EAck_Fail:
+			fmt.Printf("Bid failed.\n")
+		default:
+			fmt.Printf("Bid failed. Exception occurred.\n")
+		}
+	} else if arg.command == "result" {
+		result, err := client.Result(context.Background(), &Void{
+			SenderID:  &c.pid,
+			Timestamp: &timestamp,
+		})
+		if err != nil {
+			c.logger.Fatal(err)
+		}
+		fmt.Printf("Auction started at: %d\n", result.GetAuctionStartTime())
+		fmt.Printf("Auction ended at: %d\n", result.GetAuctionStartTime())
+		fmt.Printf("Leading bid is %d,- by %d.\n", result.GetLeadingBid(), result.GetLeadingID())
+	}
 }
 
 // ShutdownLogging closes the file which backs the logger.
@@ -75,13 +103,30 @@ func (c *Client) logf(format string, v ...any) {
 	}
 }
 
-func parseArguments() (port uint16) {
-	if len(os.Args) != 2 {
-		log.Fatalf("Incorrect number of arguments.\nUsage: %s <port>\n", os.Args[0])
+func parseArguments() (arg *Argument) {
+	if len(os.Args) == 3 && os.Args[1] == "bid" {
+		amount, err := strconv.ParseUint(os.Args[2], 10, 16)
+		if err == nil {
+			arg = &Argument{
+				command: os.Args[1],
+				amount:  amount,
+			}
+			return arg
+		}
+	} else if len(os.Args) == 2 && os.Args[1] == "result" {
+		return &Argument{
+			command: os.Args[1],
+		}
 	}
-	arg, err := strconv.ParseUint(os.Args[1], 10, 16)
-	if err != nil {
-		log.Fatalf("Invalid port number.\nUsage: %s <port>\n", os.Args[0])
-	}
-	return uint16(arg)
+	log.Println("Could not understand arguments.")
+	fmt.Println("Usage:")
+	fmt.Println("\t./client bid <amount>")
+	fmt.Println("\t./client result")
+	os.Exit(1)
+	return nil
+}
+
+type Argument struct {
+	command string
+	amount  uint64
 }

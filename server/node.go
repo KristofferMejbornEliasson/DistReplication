@@ -36,6 +36,7 @@ type Server struct {
 	State        eCriticalSystemState
 	RequestQueue []int64
 	auction      *Auction
+	isLeader     bool
 }
 
 func main() {
@@ -45,6 +46,7 @@ func main() {
 		wg:           &sync.WaitGroup{},
 		State:        RELEASED,
 		RequestQueue: make([]int64, 0),
+		isLeader:     false,
 	}
 	server.Nodes = setupOtherNodeList(*server.Port)
 
@@ -129,7 +131,7 @@ func ParseArguments(args []string) *int64 {
 
 // Bid is the RPC executed when the caller wants access to the critical area.
 func (s *Server) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
-	s.logf("Received bid request from client %d.", msg.GetSenderId())
+	s.logf("Received bid request from client %d.", msg.GetSenderID())
 	s.Timestamp.UpdateTime(*msg.Timestamp)
 	s.Timestamp.Increment()
 	timestamp := s.Timestamp.Now()
@@ -137,7 +139,7 @@ func (s *Server) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
 	if s.auction != nil && s.auction.IsActive() {
 		state = EAck_Fail
 		return &BidResponse{
-			SenderId:  s.Port,
+			SenderID:  s.Port,
 			Timestamp: &timestamp,
 			Ack:       &state,
 		}, nil
@@ -151,7 +153,7 @@ func (s *Server) Result(_ context.Context, msg *Void) (*Outcome, error) {
 	s.wg.Done() // Decrements the wait-group's counter.
 	s.Timestamp.UpdateTime(*msg.Timestamp)
 	s.Timestamp.Increment()
-	s.logf("Received reply to critical area access request from node %d.", msg.GetSenderId())
+	s.logf("Received reply to critical area access request from node %d.", msg.GetSenderID())
 	return nil, nil
 }
 
@@ -221,7 +223,7 @@ func setupOtherNodeList(port int64) []int64 {
 func (s *Server) GenerateVoidMessage() *Void {
 	timestamp := s.Timestamp.Now()
 	return &Void{
-		SenderId:  s.Port,
+		SenderID:  s.Port,
 		Timestamp: &timestamp,
 	}
 }
