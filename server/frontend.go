@@ -17,13 +17,15 @@ const FrontendPort = 4999
 
 type Frontend struct {
 	UnimplementedFrontendServer
-	logger *log.Logger
-	wait   chan struct{}
+	logger      *log.Logger
+	wait        chan struct{}
+	primaryPort int64
 }
 
 func main() {
 	frontend := Frontend{
-		wait: make(chan struct{}),
+		wait:        make(chan struct{}),
+		primaryPort: 5000,
 	}
 
 	file, err := os.Create("log.txt")
