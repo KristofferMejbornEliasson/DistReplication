@@ -36,7 +36,7 @@ func main() {
 
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", FrontendPort))
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		frontend.fatalf("failed to listen: %v", err)
 	}
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
@@ -44,7 +44,7 @@ func main() {
 
 	err = grpcServer.Serve(lis)
 	if err != nil {
-		frontend.logger.Fatalf("failed to serve: %v", err)
+		frontend.fatalf("failed to serve: %v", err)
 	}
 	frontend.logf("Listening on %s.\n", lis.Addr())
 	for {
@@ -65,6 +65,14 @@ func (f *Frontend) logf(format string, v ...any) {
 	} else {
 		f.logger.Print(text)
 	}
+}
+
+// fatalf writes a message to the log file (appending a newline if necessary),
+// and exits the programme with exit code 1.
+// Mostly equivalent to log.Fatalf
+func (f *Frontend) fatalf(format string, v ...any) {
+	f.logf(format, v...)
+	os.Exit(1)
 }
 
 // ShutdownLogging closes the file which backs the logger.
