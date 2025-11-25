@@ -5,13 +5,13 @@ grpc/auction_grpc.pb.go grpc/auction.pb.go: grpc/auction.proto
 
 proto: grpc/auction_grpc.pb.go grpc/auction.pb.go
 
-client.exe: client/client.go
+client.exe: client/client.go time/lamport.go
 	go build -o client.exe client/client.go
 
-node.exe: server/node.go server/auction.go
+node.exe: server/node.go server/auction.go time/lamport.go
 	go build -o node.exe server/node.go server/auction.go
 
-frontend.exe: server/frontend.go server/auction.go
+frontend.exe: server/frontend.go server/auction.go time/lamport.go
 	go build -o frontend.exe server/frontend.go server/auction.go
 
 clean:
