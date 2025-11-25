@@ -30,7 +30,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	prefix := fmt.Sprintf("Node %d: ", c.pid)
+	prefix := fmt.Sprintf("Client %d: ", c.pid)
 	c.logger = log.New(file, prefix, 0)
 	defer c.ShutdownLogging(file)
 
@@ -87,13 +87,13 @@ func main() {
 
 // ShutdownLogging closes the file which backs the logger.
 func (c *Client) ShutdownLogging(writer *os.File) {
-	c.logf("Node shut down.\n")
+	c.logf("Client shut down.\n")
 	_ = writer.Close()
 }
 
 // logf writes a message to the log file.
 func (c *Client) logf(format string, v ...any) {
-	prefix := fmt.Sprintf("Node %d. Time: %d. ", c.pid, c.Timestamp)
+	prefix := fmt.Sprintf("Client %d. Time: %d. ", c.pid, c.Timestamp)
 	c.logger.SetPrefix(prefix)
 	text := fmt.Sprintf(format, v...)
 	if !(strings.HasSuffix(format, "\n") || strings.HasSuffix(format, "\r")) {
@@ -103,15 +103,21 @@ func (c *Client) logf(format string, v ...any) {
 	}
 }
 
+// parseArguments parses the programme arguments and returns a struct containing
+// these.
+//
+// If the user has typed in "result" as the argument, then the Argument.amount is meaningless.
+//
+// Displays help text and terminates the programme with exit-code 1 if something
+// goes wrong.
 func parseArguments() (arg *Argument) {
 	if len(os.Args) == 3 && os.Args[1] == "bid" {
 		amount, err := strconv.ParseUint(os.Args[2], 10, 16)
 		if err == nil {
-			arg = &Argument{
+			return &Argument{
 				command: os.Args[1],
 				amount:  amount,
 			}
-			return arg
 		}
 	} else if len(os.Args) == 2 && os.Args[1] == "result" {
 		return &Argument{
@@ -126,6 +132,14 @@ func parseArguments() (arg *Argument) {
 	return nil
 }
 
+// Argument is a struct used for passing along the command-line arguments of the
+// programme so that the parsing logic can be extracted from the main function.
+//
+// `command` contains the entire first argument string, thought of as the
+// "command". Equal to either "bid" or "result".
+//
+// `amount` contains the amount of money which the user specified as argument to
+// the command "bid". If "result" was entered, this variable is unused.
 type Argument struct {
 	command string
 	amount  uint64
