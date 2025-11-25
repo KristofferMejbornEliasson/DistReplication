@@ -104,8 +104,9 @@ func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error)
 	// Connect to primary replica manager
 	conn, err := f.createConnection()
 	if err != nil {
+		// An error here is unrelated to whether something is actually listening
+		// on the given port. Nothing we can do about this.
 		f.logf("Error creating connection to replica manager via port %d:\n%v", f.primaryPort, err)
-		// TODO: Handle what to do when the primary replica manager is inaccessible.
 
 		f.timestamp.Increment() // Timestamp for send event (to client)
 		f.logf("Sending exception response to client %d.\n", msg.GetSenderID())
@@ -167,8 +168,9 @@ func (f *Frontend) Result(_ context.Context, msg *Void) (*Outcome, error) {
 	// Connect to primary replica manager
 	conn, err := f.createConnection()
 	if err != nil {
+		// An error here is unrelated to whether something is actually listening
+		// on the given port. Nothing we can do about this.
 		f.logf("Error creating connection to replica manager via port %d:\n%v", f.primaryPort, err)
-		// TODO: Handle what to do when the primary replica manager is inaccessible.
 
 		f.timestamp.Increment() // Timestamp for send event (to client)
 		f.logf("Sending exception response to client %d.", msg.GetSenderID())
