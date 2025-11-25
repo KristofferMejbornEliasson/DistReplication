@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"os"
 	"strconv"
@@ -161,14 +162,34 @@ func (s *Server) Result(_ context.Context, msg *Void) (*Outcome, error) {
 
 	s.Timestamp.Increment() // Timestamp for send event to client.
 	now := s.Timestamp.Now()
+	var invalid int64 = math.MinInt64
+
+	// No auction exists.
+	if s.auction == nil {
+		s.logf("No auction exists. Responding to client.")
+		return &Outcome{
+			SenderID:         s.Port,
+			Timestamp:        &now,
+			AuctionStartTime: &invalid,
+			AuctionEndTime:   &invalid,
+			LeadingID:        &invalid,
+			LeadingBid:       nil,
+		}, nil
+	}
+
 	start := s.auction.start.Unix()
 	end := s.auction.end.Unix()
+	leader := invalid
+	if s.auction.leadingID != nil {
+		leader = *s.auction.leadingID
+	}
+	s.logf("Responding to client with auction information.")
 	return &Outcome{
 		SenderID:         s.Port,
 		Timestamp:        &now,
 		AuctionStartTime: &start,
 		AuctionEndTime:   &end,
-		LeadingID:        s.auction.leadingID,
+		LeadingID:        &leader,
 		LeadingBid:       s.auction.leadingBid,
 	}, nil
 }

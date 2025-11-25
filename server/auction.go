@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -27,17 +28,18 @@ func Reconstruct(leadingBid *uint64, leadingID *int64, startUnix int64, endUnix 
 
 // StartNewAuction creates a new Auction which starts now, and runs for 100 seconds.
 func StartNewAuction(startingBid uint64) *Auction {
-	return NewAuctionPeriod(startingBid, time.Now(), 100)
+	return NewAuctionPeriod(startingBid, time.Now(), 100*time.Second)
 }
 
 // StartNewAuctionPeriod creates a new Auction which starts now, and runs for
-// the given duration.
+// the given time.Duration.
 func StartNewAuctionPeriod(startingBid uint64, duration time.Duration) *Auction {
 	return NewAuctionPeriod(startingBid, time.Now(), duration)
 }
 
 // NewAuction creates a new Auction to run between the given start and end times.
 func NewAuction(startingBid uint64, start time.Time, end time.Time) *Auction {
+	fmt.Printf("Creating new auction in period between %v and %v.\n", start, end)
 	return &Auction{
 		start:      &start,
 		end:        &end,

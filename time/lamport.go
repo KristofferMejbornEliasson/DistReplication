@@ -1,6 +1,7 @@
 package time
 
 import (
+	"fmt"
 	"strconv"
 	"sync"
 )
@@ -56,5 +57,5 @@ func (l *Lamport) UpdateTime(other uint64) uint64 {
 }
 
 func (l *Lamport) String() string {
-	return strconv.FormatUint(l.Now(), 10)
+	return fmt.Sprintf("%s", strconv.FormatUint(l.Now(), 10))
 }

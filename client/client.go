@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -67,16 +68,32 @@ func main() {
 }
 
 func (c *Client) Result(connection FrontendClient, timestamp uint64) {
+	c.Timestamp.Increment() // Timestamp for sending request to front end.
+	c.logf("Sending result request to server.")
 	result, err := connection.Result(context.Background(), &Void{
 		SenderID:  &c.pid,
 		Timestamp: &timestamp,
 	})
-	if err != nil {
-		c.log(err)
+	if result != nil {
+		c.Timestamp.UpdateTime(result.GetTimestamp())
 	}
-	fmt.Printf("Auction started at: %v\n", time.Unix(result.GetAuctionStartTime(), 0))
-	fmt.Printf("Auction ended at: %v\n", time.Unix(result.GetAuctionStartTime(), 0))
-	fmt.Printf("Leading bid is %d,- by %d.\n", result.GetLeadingBid(), result.GetLeadingID())
+	c.Timestamp.Increment()
+
+	if err != nil {
+		c.fatal(err)
+	}
+	c.logf("Received response to result request from server.")
+	if result.GetAuctionStartTime() == math.MinInt64 {
+		c.fatalf("No auction is running, nor has one ever run on the server.")
+	}
+
+	c.logf("Auction started at: %v\n", time.Unix(result.GetAuctionStartTime(), 0))
+	c.logf("Auction ended at: %v\n", time.Unix(result.GetAuctionEndTime(), 0))
+	if result.GetLeadingID() == math.MinInt64 {
+		c.logf("No-one has bid on the auction so far.")
+	} else {
+		c.logf("Leading bid is %d,- by %d.\n", result.GetLeadingBid(), result.GetLeadingID())
+	}
 }
 
 func (c *Client) Bid(connection FrontendClient, timestamp uint64, arg *Argument) {
@@ -141,6 +158,9 @@ func (c *Client) fatal(v ...any) {
 // Displays help text and terminates the programme with exit-code 1 if something
 // goes wrong.
 func parseArguments() (arg *Argument) {
+	if len(os.Args) >= 2 {
+		os.Args[1] = strings.ToLower(os.Args[1])
+	}
 	if len(os.Args) == 3 && os.Args[1] == "bid" {
 		amount, err := strconv.ParseUint(os.Args[2], 10, 16)
 		if err == nil {
