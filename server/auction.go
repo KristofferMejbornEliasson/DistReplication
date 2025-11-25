@@ -1,12 +1,16 @@
 package main
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 type Auction struct {
 	start      *time.Time // Point in time when auction starts
 	end        *time.Time // Point in time when auction ends
 	leadingBid *uint64    // Leading bid amount.
 	leadingId  *int64     // ID of leading bidder. Nil if no-one has bid
+	lock       *sync.Mutex
 }
 
 // StartNewAuction creates a new Auction which starts now, and runs for 100 seconds.
@@ -27,6 +31,7 @@ func NewAuction(startingBid uint64, start time.Time, end time.Time) *Auction {
 		end:        &end,
 		leadingBid: &startingBid,
 		leadingId:  nil,
+		lock:       &sync.Mutex{},
 	}
 }
 

@@ -33,7 +33,7 @@ type Server struct {
 
 func main() {
 	server := Server{
-		Timestamp:    new(Lamport),
+		Timestamp:    NewLamport(),
 		Port:         ParseArguments(os.Args),
 		wg:           &sync.WaitGroup{},
 		RequestQueue: make([]int64, 0),

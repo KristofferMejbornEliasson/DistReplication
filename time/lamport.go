@@ -10,6 +10,13 @@ type Lamport struct {
 	lock      *sync.Mutex
 }
 
+func NewLamport() *Lamport {
+	return &Lamport{
+		timestamp: 0,
+		lock:      &sync.Mutex{},
+	}
+}
+
 // Now returns the current timestamp value.
 func (l *Lamport) Now() uint64 {
 	l.lock.Lock()

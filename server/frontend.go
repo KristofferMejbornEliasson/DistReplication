@@ -30,7 +30,7 @@ func main() {
 	frontend := Frontend{
 		wait:        make(chan struct{}),
 		primaryPort: 5000,
-		timestamp:   new(Lamport),
+		timestamp:   NewLamport(),
 	}
 
 	// Setup logger
