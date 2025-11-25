@@ -28,6 +28,7 @@ func main() {
 		primaryPort: 5000,
 	}
 
+	// Setup logger
 	file, err := os.Create("log.txt")
 	if err != nil {
 		log.Fatal(err)
@@ -36,6 +37,7 @@ func main() {
 	frontend.logger = log.New(file, prefix, 0)
 	defer frontend.ShutdownLogging(file)
 
+	// Setup listening server
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", FrontendPort))
 	if err != nil {
 		frontend.fatalf("failed to listen: %v", err)
@@ -44,6 +46,7 @@ func main() {
 	grpcServer := grpc.NewServer(opts...)
 	RegisterFrontendServer(grpcServer, &frontend)
 
+	// Start listening
 	err = grpcServer.Serve(lis)
 	if err != nil {
 		frontend.fatalf("failed to serve: %v", err)
@@ -57,7 +60,8 @@ func main() {
 	}
 }
 
-// logf writes a message to the log file.
+// logf writes a message to the log file, appending a newline if necessary.
+// Mostly equivalent to log.Printf.
 func (f *Frontend) logf(format string, v ...any) {
 	prefix := fmt.Sprintf("Frontend: ")
 	f.logger.SetPrefix(prefix)
@@ -83,14 +87,14 @@ func (f *Frontend) ShutdownLogging(writer *os.File) {
 	_ = writer.Close()
 }
 
-// Bid is the RPC executed when the caller wants access to the critical area.
+// Bid is the RPC executed when the client wants to register a new bid.
 func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
 	f.logf("Received bid request from client %d.", msg.GetSenderID())
 	return nil, nil
 }
 
-// Result is the RPC executed when the caller is finished in the critical area,
-// and found this node in its queue.
+// Result is the RPC executed when the client wants to see the result of the
+// current or latest Auction.
 func (f *Frontend) Result(_ context.Context, msg *Void) (*Outcome, error) {
 	f.logf("Received reply to critical area access request from node %d.", msg.GetSenderID())
 	return nil, nil
