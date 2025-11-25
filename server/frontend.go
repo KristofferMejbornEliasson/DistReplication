@@ -42,7 +42,7 @@ func main() {
 	// Setup listening server
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", FrontendPort))
 	if err != nil {
-		frontend.fatalf("failed to listen: %v", err)
+		frontend.fatalf("Failed to listen: %v", err)
 	}
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
@@ -51,7 +51,7 @@ func main() {
 	// Start listening
 	err = grpcServer.Serve(lis)
 	if err != nil {
-		frontend.fatalf("failed to serve: %v", err)
+		frontend.fatalf("Failed to serve: %v", err)
 	}
 	frontend.logf("Listening on %s.\n", lis.Addr())
 	for {
@@ -91,16 +91,18 @@ func (f *Frontend) ShutdownLogging(writer *os.File) {
 
 // Bid is the RPC executed when the client wants to register a new bid.
 func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
-	f.logf("Received bid request from client %d.", msg.GetSenderID())
+	f.logf("Received a Bid request from client %d.", msg.GetSenderID())
 	conn, err := f.createConnection()
 	if err != nil {
-		f.logf("Error creating connection to server: %v", err)
+		f.logf("Error creating connection to replica manager via port %d:\n%v",
+			f.primaryPort, err)
 		return nil, err
 	}
 	defer func(conn *grpc.ClientConn) {
 		err := conn.Close()
 		if err != nil {
-			f.logf("Error closing connection:\n%v", err)
+			f.logf("Error closing connection to replica manager via port %d:\n%v",
+				f.primaryPort, err)
 		}
 	}(conn)
 	return nil, nil
@@ -109,16 +111,18 @@ func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error)
 // Result is the RPC executed when the client wants to see the result of the
 // current or latest Auction.
 func (f *Frontend) Result(_ context.Context, msg *Void) (*Outcome, error) {
-	f.logf("Received reply to critical area access request from node %d.", msg.GetSenderID())
+	f.logf("Received a Result request from client %d.", msg.GetSenderID())
 	conn, err := f.createConnection()
 	if err != nil {
-		f.logf("Error creating connection to server: %v", err)
+		f.logf("Error creating connection to replica manager via port %d:\n%v",
+			f.primaryPort, err)
 		return nil, err
 	}
 	defer func(conn *grpc.ClientConn) {
 		err := conn.Close()
 		if err != nil {
-			f.logf("Error closing connection:\n%v", err)
+			f.logf("Error closing connection to replica manager via port %d:\n%v",
+				f.primaryPort, err)
 		}
 	}(conn)
 	return nil, nil
