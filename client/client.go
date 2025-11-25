@@ -7,9 +7,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	. "DistReplication/grpc"
-	"DistReplication/time"
+	. "DistReplication/time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -18,15 +19,15 @@ import (
 const FrontendPort = 4999
 
 type Client struct {
-	pid       int64         // Client's process ID.
-	logger    *log.Logger   // Instance used for logging.
-	Timestamp *time.Lamport // Local Lamport timestamp.
+	pid       int64       // Client's process ID.
+	logger    *log.Logger // Instance used for logging.
+	Timestamp *Lamport    // Local Lamport timestamp.
 }
 
 func main() {
 	c := Client{
 		pid:       int64(os.Getpid()),
-		Timestamp: time.NewLamport(),
+		Timestamp: NewLamport(),
 	}
 
 	file, err := os.Create("log.txt")
@@ -73,8 +74,8 @@ func (c *Client) Result(connection FrontendClient, timestamp uint64) {
 	if err != nil {
 		c.log(err)
 	}
-	fmt.Printf("Auction started at: %d\n", result.GetAuctionStartTime())
-	fmt.Printf("Auction ended at: %d\n", result.GetAuctionStartTime())
+	fmt.Printf("Auction started at: %v\n", time.Unix(result.GetAuctionStartTime(), 0))
+	fmt.Printf("Auction ended at: %v\n", time.Unix(result.GetAuctionStartTime(), 0))
 	fmt.Printf("Leading bid is %d,- by %d.\n", result.GetLeadingBid(), result.GetLeadingID())
 }
 
