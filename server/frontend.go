@@ -52,11 +52,11 @@ func main() {
 	RegisterFrontendServer(grpcServer, &frontend)
 
 	// Start listening
+	frontend.logf("Starting listening on %s.", lis.Addr())
 	err = grpcServer.Serve(lis)
 	if err != nil {
 		frontend.fatalf("Failed to serve: %v", err)
 	}
-	frontend.logf("Listening on %s.\n", lis.Addr())
 	for {
 		select {
 		case <-frontend.wait:
@@ -71,11 +71,11 @@ func (f *Frontend) logf(format string, v ...any) {
 	prefix := fmt.Sprintf("Frontend at time %d: ", f.timestamp)
 	f.logger.SetPrefix(prefix)
 	text := fmt.Sprintf(format, v...)
-	if !(strings.HasSuffix(format, "\n") || strings.HasSuffix(format, "\r")) {
-		f.logger.Println(text)
-	} else {
-		f.logger.Print(text)
+	if !(strings.HasSuffix(text, "\n") || strings.HasSuffix(text, "\r")) {
+		text = text + "\n"
 	}
+	f.logger.Print(text)
+	fmt.Print(text)
 }
 
 // fatalf writes a message to the log file (appending a newline if necessary),
@@ -93,10 +93,13 @@ func (f *Frontend) ShutdownLogging(writer *os.File) {
 }
 
 // Bid is the RPC executed when the client wants to register a new bid.
+// It passes this request onto the primary replica manager and returns the response.
 func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
 	f.timestamp.UpdateTime(*msg.Timestamp)
 	f.timestamp.Increment() // Timestamp for receive event (from client)
 	f.logf("Received a Bid request from client %d.", msg.GetSenderID())
+
+	f.timestamp.Increment() // Timestamp for creating connection to replica manager node.
 
 	// Connect to primary replica manager
 	conn, err := f.createConnection()
@@ -107,9 +110,10 @@ func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error)
 		f.timestamp.Increment() // Timestamp for send event (to client)
 		f.logf("Sending exception response to client %d.\n", msg.GetSenderID())
 		ack := EAck_Exception
+		now := f.timestamp.Now()
 		return &BidResponse{
 			SenderID:  msg.SenderID,
-			Timestamp: msg.Timestamp,
+			Timestamp: &now,
 			Ack:       &ack,
 		}, err
 	}
@@ -120,9 +124,37 @@ func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error)
 		}
 	}(conn)
 
+	f.timestamp.Increment() // Timestamp for send event to replica manager node.
+
 	// Pass on request to primary replica manager
 	client := NewNodeClient(conn)
-	return client.Bid(context.Background(), msg)
+	response, err := client.Bid(context.Background(), msg)
+	if response != nil && response.Timestamp != nil {
+		f.timestamp.UpdateTime(*response.Timestamp)
+	}
+	f.timestamp.Increment() // Timestamp for receive event (from replica manager node)
+
+	if err != nil || response == nil {
+		f.logf("Error on RPC to replica manager via port %d:\n%v", f.primaryPort, err)
+		// TODO: Handle what to do when the primary replica manager is inaccessible.
+
+		f.timestamp.Increment() // Timestamp for send event (to client)
+		f.logf("Sending exception response to client %d.", msg.GetSenderID())
+		return response, err
+	}
+
+	f.logf("Received outcome from replica manager via port %d:\n%v", f.primaryPort, response)
+
+	f.timestamp.Increment() // Timestamp for send event (to client)
+	f.logf("Forwarding response back to client %d.", msg.GetSenderID())
+
+	now := f.timestamp.Now()
+	newResponse := &BidResponse{
+		SenderID:  msg.SenderID,
+		Timestamp: &now,
+		Ack:       response.Ack,
+	}
+	return newResponse, err
 }
 
 // Result is the RPC executed when the client wants to see the result of the
@@ -169,10 +201,19 @@ func (f *Frontend) Result(_ context.Context, msg *Void) (*Outcome, error) {
 
 	if err != nil {
 		f.logf("Error on RPC to replica manager via port %d:\n%v", f.primaryPort, err)
+		// TODO: Handle what to do when the primary replica manager is inaccessible.
 
 		f.timestamp.Increment() // Timestamp for send event (to client)
 		f.logf("Sending exception response to client %d.", msg.GetSenderID())
-		return outcome, err
+		now = f.timestamp.Now()
+		return &Outcome{
+			SenderID:         &f.primaryPort,
+			Timestamp:        &now,
+			AuctionStartTime: nil,
+			AuctionEndTime:   nil,
+			LeadingBid:       nil,
+			LeadingID:        nil,
+		}, err
 	}
 	f.logf("Received outcome from replica manager via port %d:\n%v", f.primaryPort, outcome)
 
