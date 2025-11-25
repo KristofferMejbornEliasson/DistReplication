@@ -99,7 +99,12 @@ func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error)
 		f.logf("Error creating connection to replica manager via port %d:\n%v",
 			f.primaryPort, err)
 		// TODO: Handle what to do when the primary replica manager is inaccessible.
-		return nil, err
+		ack := EAck_Exception
+		return &BidResponse{
+			SenderID:  msg.SenderID,
+			Timestamp: msg.Timestamp,
+			Ack:       &ack,
+		}, err
 	}
 	defer func(conn *grpc.ClientConn) {
 		err := conn.Close()
