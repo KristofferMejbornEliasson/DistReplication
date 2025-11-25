@@ -13,6 +13,18 @@ type Auction struct {
 	lock       *sync.Mutex
 }
 
+// Reconstruct creates an Auction based on unix start- and end-timestamps.
+func Reconstruct(leadingBid *uint64, leadingID *int64, startUnix int64, endUnix int64) *Auction {
+	start := time.Unix(startUnix, 0)
+	end := time.Unix(endUnix, 0)
+	return &Auction{
+		start:      &start,
+		end:        &end,
+		leadingBid: leadingBid,
+		leadingID:  leadingID,
+	}
+}
+
 // StartNewAuction creates a new Auction which starts now, and runs for 100 seconds.
 func StartNewAuction(startingBid uint64) *Auction {
 	return NewAuctionPeriod(startingBid, time.Now(), 100)
