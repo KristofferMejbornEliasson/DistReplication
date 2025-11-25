@@ -141,6 +141,7 @@ func (s *Server) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
 	if s.auction != nil {
 		if s.auction.TryBid(msg.GetSenderID(), msg.GetAmount()) {
 			state = EAck_Success
+			s.updateBackups(msg.RequestID)
 		} else {
 			state = EAck_Fail
 		}
@@ -160,42 +161,25 @@ func (s *Server) Result(_ context.Context, msg *Void) (*Outcome, error) {
 	s.logf("Received Result request from client %d.", msg.GetSenderID())
 
 	s.Timestamp.Increment() // Timestamp for send event to client.
-	now := s.Timestamp.Now()
-	var invalid int64 = math.MinInt64
-
-	// No auction exists.
 	if s.auction == nil {
 		s.logf("No auction exists. Responding to client.")
-		return &Outcome{
-			SenderID:         s.Port,
-			Timestamp:        &now,
-			AuctionStartTime: &invalid,
-			AuctionEndTime:   &invalid,
-			LeadingID:        &invalid,
-			LeadingBid:       nil,
-		}, nil
+	} else {
+		s.logf("Responding to client with auction information.")
 	}
-
-	start := s.auction.start.Unix()
-	end := s.auction.end.Unix()
-	leader := invalid
-	if s.auction.leadingID != nil {
-		leader = *s.auction.leadingID
-	}
-	s.logf("Responding to client with auction information.")
-	return &Outcome{
-		SenderID:         s.Port,
-		Timestamp:        &now,
-		AuctionStartTime: &start,
-		AuctionEndTime:   &end,
-		LeadingID:        &leader,
-		LeadingBid:       s.auction.leadingBid,
-	}, nil
+	return s.generateOutcome(), nil
 }
 
-// reply sends the individual response to a target node after this node has finished
-// inside the critical section.
-func (s *Server) reply(targetPort int64) {
+// updateBackups executes the Update RPC on each other replica manager in Server.Nodes.
+// This is a synchronous operation.
+func (s *Server) updateBackups(requestID *string) {
+	outcome := s.generateOutcome()
+	for _, port := range s.Nodes {
+		s.updateBackup(port, outcome, requestID)
+	}
+}
+
+// updateBackup sends the state of the current Auction to the backup at the given port.
+func (s *Server) updateBackup(targetPort int64, outcome *Outcome, requestID *string) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	targetAddress := fmt.Sprintf("localhost:%d", targetPort)
@@ -209,12 +193,23 @@ func (s *Server) reply(targetPort int64) {
 			s.logger.Fatalf("Error closing connection:\n%v", err)
 		}
 	}(conn)
-	/*client := NewNodeClient(conn)
+
+	client := NewNodeClient(conn)
+	s.Timestamp.Increment()
 	timestamp := s.Timestamp.Now()
-	_, err = client.Result(context.Background(), &Message{
-		Timestamp: &timestamp,
-		Id:        s.Port,
-	})*/
+	outcome.Timestamp = &timestamp
+	response, err := client.Update(context.Background(), &UpdateQuery{
+		Outcome:   outcome,
+		RequestID: requestID,
+	})
+	if err != nil {
+		s.Timestamp.Increment()
+		s.logf("Could not update backup at port %d: %v", targetPort, err)
+	} else {
+		s.Timestamp.UpdateTime(*response.Timestamp)
+		s.Timestamp.Increment()
+		s.logf("Updated backup at port %d.", targetPort)
+	}
 }
 
 // logf writes a message to the log file, appending a newline if necessary.
@@ -256,7 +251,9 @@ func setupOtherNodeList(port int64) []int64 {
 	return nodes
 }
 
-func (s *Server) GenerateVoidMessage() *Void {
+// generateVoidMessage creates a Void struct, which contains information on the
+// sender and their current Lamport timestamp.
+func (s *Server) generateVoidMessage() *Void {
 	timestamp := s.Timestamp.Now()
 	return &Void{
 		SenderID:  s.Port,
@@ -264,6 +261,8 @@ func (s *Server) GenerateVoidMessage() *Void {
 	}
 }
 
+// startAuction creates a new Auction with a start time when it is called, and
+// an end-time 100 seconds later.
 func (s *Server) startAuction() {
 	if s.isLeader {
 		if s.auction == nil || s.auction.end.Before(time.Now()) {
@@ -283,6 +282,8 @@ func throwParseException(err string) {
 	log.Fatalf("%s\n%s\n", err, UsageText)
 }
 
+// Update is the RPC executed in a backup when the leader wishes to update it
+// with changes to the Auction state.
 func (s *Server) Update(_ context.Context, msg *UpdateQuery) (*Void, error) {
 	outcome := msg.GetOutcome()
 	s.Timestamp.UpdateTime(outcome.GetTimestamp())
@@ -295,5 +296,39 @@ func (s *Server) Update(_ context.Context, msg *UpdateQuery) (*Void, error) {
 		outcome.GetAuctionEndTime())
 
 	s.Timestamp.Increment() // Timestamp for send event
-	return s.GenerateVoidMessage(), nil
+	return s.generateVoidMessage(), nil
+}
+
+// generateOutcome generates an Outcome struct which contains information on the
+// current state of the Auction.
+func (s *Server) generateOutcome() *Outcome {
+	now := s.Timestamp.Now()
+	var invalid int64 = math.MinInt64
+
+	// No auction exists.
+	if s.auction == nil {
+		return &Outcome{
+			SenderID:         s.Port,
+			Timestamp:        &now,
+			AuctionStartTime: &invalid,
+			AuctionEndTime:   &invalid,
+			LeadingID:        &invalid,
+			LeadingBid:       nil,
+		}
+	}
+
+	start := s.auction.start.Unix()
+	end := s.auction.end.Unix()
+	leader := invalid
+	if s.auction.leadingID != nil {
+		leader = *s.auction.leadingID
+	}
+	return &Outcome{
+		SenderID:         s.Port,
+		Timestamp:        &now,
+		AuctionStartTime: &start,
+		AuctionEndTime:   &end,
+		LeadingID:        &leader,
+		LeadingBid:       s.auction.leadingBid,
+	}
 }
