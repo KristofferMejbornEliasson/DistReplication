@@ -92,6 +92,8 @@ func (f *Frontend) ShutdownLogging(writer *os.File) {
 // Bid is the RPC executed when the client wants to register a new bid.
 func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
 	f.logf("Received a Bid request from client %d.", msg.GetSenderID())
+
+	// Connect to primary replica manager
 	conn, err := f.createConnection()
 	if err != nil {
 		f.logf("Error creating connection to replica manager via port %d:\n%v",
@@ -105,13 +107,18 @@ func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error)
 				f.primaryPort, err)
 		}
 	}(conn)
-	return nil, nil
+
+	// Pass on request to primary replica manager
+	client := NewNodeClient(conn)
+	return client.Bid(context.Background(), msg)
 }
 
 // Result is the RPC executed when the client wants to see the result of the
 // current or latest Auction.
 func (f *Frontend) Result(_ context.Context, msg *Void) (*Outcome, error) {
 	f.logf("Received a Result request from client %d.", msg.GetSenderID())
+
+	// Connect to primary replica manager
 	conn, err := f.createConnection()
 	if err != nil {
 		f.logf("Error creating connection to replica manager via port %d:\n%v",
@@ -125,7 +132,10 @@ func (f *Frontend) Result(_ context.Context, msg *Void) (*Outcome, error) {
 				f.primaryPort, err)
 		}
 	}(conn)
-	return nil, nil
+
+	// Pass on request to primary replica manager
+	client := NewNodeClient(conn)
+	return client.Result(context.Background(), msg)
 }
 
 // createConnection establishes a GRPC client connection. It is the caller's
