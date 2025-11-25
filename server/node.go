@@ -282,3 +282,18 @@ func throwParseException(err string) {
 	const UsageText string = "Usage:\n\t./node <port>"
 	log.Fatalf("%s\n%s\n", err, UsageText)
 }
+
+func (s *Server) Update(_ context.Context, msg *UpdateQuery) (*Void, error) {
+	outcome := msg.GetOutcome()
+	s.Timestamp.UpdateTime(outcome.GetTimestamp())
+	s.Timestamp.Increment() // Timestamp for receiving event
+
+	s.auction = Reconstruct(
+		outcome.LeadingBid,
+		outcome.LeadingID,
+		outcome.GetAuctionStartTime(),
+		outcome.GetAuctionEndTime())
+
+	s.Timestamp.Increment() // Timestamp for send event
+	return s.GenerateVoidMessage(), nil
+}

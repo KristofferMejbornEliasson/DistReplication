@@ -10,7 +10,7 @@ type Auction struct {
 	start      *time.Time // Point in time when auction starts
 	end        *time.Time // Point in time when auction ends
 	leadingBid *uint64    // Leading bid amount.
-	leadingID  *int64     // ID of leading bidder. Nil if no-one has bid
+	leadingID  *int64     // ID of leading bidder. Nil or value of math.MinInt64 if no-one has bid
 	lock       *sync.Mutex
 }
 
