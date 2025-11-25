@@ -47,41 +47,50 @@ func main() {
 			c.logger.Fatalf("Error closing connection:\n%v", err)
 		}
 	}(conn)
-	client := NewNodeClient(conn)
+	grpcClient := NewNodeClient(conn)
 	timestamp := c.Timestamp.Now()
 
 	arg := parseArguments()
 	if arg == nil {
 		c.logger.Fatalln("Could not parse arguments.")
 	}
-	if arg.command == "bid" {
-		response, err := client.Bid(context.Background(), &BidRequest{
-			SenderID:  &c.pid,
-			Timestamp: &timestamp,
-			Amount:    &arg.amount,
-		})
-		if err != nil {
-			c.logger.Fatal(err)
-		}
-		switch response.GetAck() {
-		case EAck_Success:
-			fmt.Printf("Bid successful. You are highest bidder with %d,-\n", arg.amount)
-		case EAck_Fail:
-			fmt.Printf("Bid failed.\n")
-		default:
-			fmt.Printf("Bid failed. Exception occurred.\n")
-		}
-	} else if arg.command == "result" {
-		result, err := client.Result(context.Background(), &Void{
-			SenderID:  &c.pid,
-			Timestamp: &timestamp,
-		})
-		if err != nil {
-			c.logger.Fatal(err)
-		}
-		fmt.Printf("Auction started at: %d\n", result.GetAuctionStartTime())
-		fmt.Printf("Auction ended at: %d\n", result.GetAuctionStartTime())
-		fmt.Printf("Leading bid is %d,- by %d.\n", result.GetLeadingBid(), result.GetLeadingID())
+	switch arg.command {
+	case "bid":
+		c.Bid(grpcClient, timestamp, arg)
+	case "result":
+		c.Result(grpcClient, timestamp)
+	}
+}
+
+func (c *Client) Result(connection NodeClient, timestamp uint64) {
+	result, err := connection.Result(context.Background(), &Void{
+		SenderID:  &c.pid,
+		Timestamp: &timestamp,
+	})
+	if err != nil {
+		c.logger.Fatal(err)
+	}
+	fmt.Printf("Auction started at: %d\n", result.GetAuctionStartTime())
+	fmt.Printf("Auction ended at: %d\n", result.GetAuctionStartTime())
+	fmt.Printf("Leading bid is %d,- by %d.\n", result.GetLeadingBid(), result.GetLeadingID())
+}
+
+func (c *Client) Bid(connection NodeClient, timestamp uint64, arg *Argument) {
+	response, err := connection.Bid(context.Background(), &BidRequest{
+		SenderID:  &c.pid,
+		Timestamp: &timestamp,
+		Amount:    &arg.amount,
+	})
+	if err != nil {
+		c.logger.Fatal(err)
+	}
+	switch response.GetAck() {
+	case EAck_Success:
+		fmt.Printf("Bid successful. You are highest bidder with %d,-\n", arg.amount)
+	case EAck_Fail:
+		fmt.Printf("Bid failed.\n")
+	default:
+		fmt.Printf("Bid failed. Exception occurred.\n")
 	}
 }
 
