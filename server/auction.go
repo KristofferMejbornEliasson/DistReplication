@@ -42,6 +42,30 @@ func NewAuctionPeriod(startingBid uint64, start time.Time, duration time.Duratio
 }
 
 func (a *Auction) IsActive() bool {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	return a.isActive()
+}
+
+func (a *Auction) isActive() bool {
 	now := time.Now()
 	return now.After(*a.start) && now.Before(*a.end)
+}
+
+// TryBid attempts to update the leading bid with the given amount.
+// If the auction is currently active and the given amount greater than
+// the current leading bid, then the auction is updated.
+//
+// Returns true if the auction was updated as a result of this function.
+//
+// A person can bid even if they are already the leading bidder.
+func (a *Auction) TryBid(bidderID int64, amount uint64) bool {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	if a.isActive() && (a.leadingBid == nil || *a.leadingBid < amount) {
+		a.leadingBid = &amount
+		a.leadingId = &bidderID
+		return true
+	}
+	return false
 }
