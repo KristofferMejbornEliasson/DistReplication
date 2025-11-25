@@ -47,7 +47,7 @@ func main() {
 			c.logger.Fatalf("Error closing connection:\n%v", err)
 		}
 	}(conn)
-	grpcClient := NewNodeClient(conn)
+	grpcClient := NewFrontendClient(conn)
 	timestamp := c.Timestamp.Now()
 
 	arg := parseArguments()
@@ -62,7 +62,7 @@ func main() {
 	}
 }
 
-func (c *Client) Result(connection NodeClient, timestamp uint64) {
+func (c *Client) Result(connection FrontendClient, timestamp uint64) {
 	result, err := connection.Result(context.Background(), &Void{
 		SenderID:  &c.pid,
 		Timestamp: &timestamp,
@@ -75,7 +75,7 @@ func (c *Client) Result(connection NodeClient, timestamp uint64) {
 	fmt.Printf("Leading bid is %d,- by %d.\n", result.GetLeadingBid(), result.GetLeadingID())
 }
 
-func (c *Client) Bid(connection NodeClient, timestamp uint64, arg *Argument) {
+func (c *Client) Bid(connection FrontendClient, timestamp uint64, arg *Argument) {
 	response, err := connection.Bid(context.Background(), &BidRequest{
 		SenderID:  &c.pid,
 		Timestamp: &timestamp,
