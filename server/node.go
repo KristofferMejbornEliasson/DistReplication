@@ -193,9 +193,10 @@ func (s *Server) reply(targetPort int64) {
 	})*/
 }
 
-// logf writes a message to the log file.
+// logf writes a message to the log file, appending a newline if necessary.
+// Mostly equivalent to log.Printf.
 func (s *Server) logf(format string, v ...any) {
-	prefix := fmt.Sprintf("Node %d. Time: %s. ", *s.Port, s.Timestamp)
+	prefix := fmt.Sprintf("Replica node %d. Time: %s. ", *s.Port, s.Timestamp)
 	s.logger.SetPrefix(prefix)
 	text := fmt.Sprintf(format, v...)
 	if !(strings.HasSuffix(format, "\n") || strings.HasSuffix(format, "\r")) {
@@ -207,9 +208,17 @@ func (s *Server) logf(format string, v ...any) {
 	}
 }
 
+// fatalf writes a message to the log file (appending a newline if necessary),
+// and exits the programme with exit code 1.
+// Mostly equivalent to log.Fatalf
+func (s *Server) fatalf(format string, v ...any) {
+	s.logf(format, v...)
+	os.Exit(1)
+}
+
 // setupOtherNodeList creates the list of other distributed nodes.
 func setupOtherNodeList(port int64) []int64 {
-	nodes := []int64{5000, 5001, 5002}
+	nodes := []int64{5000, 5001, 5002, 5003}
 
 	// Remove own node from list
 	for i := range nodes {

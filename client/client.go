@@ -100,7 +100,8 @@ func (c *Client) ShutdownLogging(writer *os.File) {
 	_ = writer.Close()
 }
 
-// logf writes a message to the log file.
+// logf writes a message to the log file, appending a newline if necessary.
+// Mostly equivalent to log.Printf.
 func (c *Client) logf(format string, v ...any) {
 	prefix := fmt.Sprintf("Client %d. Time: %d. ", c.pid, c.Timestamp)
 	c.logger.SetPrefix(prefix)
@@ -110,6 +111,14 @@ func (c *Client) logf(format string, v ...any) {
 	} else {
 		c.logger.Print(text)
 	}
+}
+
+// fatalf writes a message to the log file (appending a newline if necessary),
+// and exits the programme with exit code 1.
+// Mostly equivalent to log.Fatalf
+func (c *Client) fatalf(format string, v ...any) {
+	c.logf(format, v...)
+	os.Exit(1)
 }
 
 // parseArguments parses the programme arguments and returns a struct containing
