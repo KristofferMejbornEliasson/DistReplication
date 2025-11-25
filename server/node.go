@@ -141,15 +141,18 @@ func (s *Server) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
 	s.Timestamp.Increment()
 	timestamp := s.Timestamp.Now()
 	state := EAck_Exception
-	if s.auction != nil && s.auction.IsActive() {
-		state = EAck_Fail
-		return &BidResponse{
-			SenderID:  s.Port,
-			Timestamp: &timestamp,
-			Ack:       &state,
-		}, nil
+	if s.auction != nil {
+		if s.auction.TryBid(msg.GetSenderID(), msg.GetAmount()) {
+			state = EAck_Success
+		} else {
+			state = EAck_Fail
+		}
 	}
-	return nil, nil
+	return &BidResponse{
+		SenderID:  s.Port,
+		Timestamp: &timestamp,
+		Ack:       &state,
+	}, nil
 }
 
 // Result is the RPC executed when the caller is finished in the critical area,
@@ -200,13 +203,11 @@ func (s *Server) logf(format string, v ...any) {
 	prefix := fmt.Sprintf("Replica node %d. Time: %s. ", *s.Port, s.Timestamp)
 	s.logger.SetPrefix(prefix)
 	text := fmt.Sprintf(format, v...)
-	if !(strings.HasSuffix(format, "\n") || strings.HasSuffix(format, "\r")) {
-		s.logger.Println(text)
-		fmt.Println(text)
-	} else {
-		s.logger.Print(text)
-		fmt.Print(text)
+	if !(strings.HasSuffix(text, "\n") || strings.HasSuffix(text, "\r")) {
+		text = text + "\n"
 	}
+	s.logger.Print(text)
+	fmt.Print(text)
 }
 
 // fatalf writes a message to the log file (appending a newline if necessary),
