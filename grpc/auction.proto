@@ -18,7 +18,7 @@ message BidRequest {
   int64 senderID = 1;
   uint64 timestamp = 2;
   uint64 amount = 3;
-  int64 requestID = 4;
+  string requestID = 4;
 }
 
 message BidResponse {
@@ -49,5 +49,5 @@ message void {
 
 message UpdateQuery {
   Outcome outcome = 1;
-  int64 requestID = 2;
+  string requestID = 2;
 }

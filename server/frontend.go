@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc/credentials/insecure"
 
 	. "DistReplication/grpc"
@@ -129,6 +130,10 @@ func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error)
 
 	// Pass on request to primary replica manager
 	client := NewNodeClient(conn)
+	now := f.timestamp.Now()
+	requestID := uuid.New().String()
+	msg.Timestamp = &now
+	msg.RequestID = &requestID
 	response, err := client.Bid(context.Background(), msg)
 	if response != nil && response.Timestamp != nil {
 		f.timestamp.UpdateTime(*response.Timestamp)
@@ -149,7 +154,7 @@ func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error)
 	f.timestamp.Increment() // Timestamp for send event (to client)
 	f.logf("Forwarding response back to client %d.", msg.GetSenderID())
 
-	now := f.timestamp.Now()
+	now = f.timestamp.Now()
 	newResponse := &BidResponse{
 		SenderID:  msg.SenderID,
 		Timestamp: &now,
