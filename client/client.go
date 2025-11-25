@@ -22,13 +22,13 @@ const FrontendPort = 4999
 type Client struct {
 	pid       int64       // Client's process ID.
 	logger    *log.Logger // Instance used for logging.
-	Timestamp *Lamport    // Local Lamport timestamp.
+	timestamp *Lamport    // Local Lamport timestamp.
 }
 
 func main() {
 	c := Client{
 		pid:       int64(os.Getpid()),
-		Timestamp: NewLamport(),
+		timestamp: NewLamport(),
 	}
 
 	file, err := os.Create("log.txt")
@@ -37,7 +37,7 @@ func main() {
 	}
 	prefix := fmt.Sprintf("Client %d: ", c.pid)
 	c.logger = log.New(file, prefix, 0)
-	defer c.ShutdownLogging(file)
+	defer c.shutdownLogging(file)
 
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -53,7 +53,7 @@ func main() {
 		}
 	}(conn)
 	grpcClient := NewFrontendClient(conn)
-	timestamp := c.Timestamp.Now()
+	timestamp := c.timestamp.Now()
 
 	arg := parseArguments()
 	if arg == nil {
@@ -61,23 +61,23 @@ func main() {
 	}
 	switch arg.command {
 	case "bid":
-		c.Bid(grpcClient, timestamp, arg)
+		c.bid(grpcClient, timestamp, arg)
 	case "result":
-		c.Result(grpcClient, timestamp)
+		c.result(grpcClient, timestamp)
 	}
 }
 
-func (c *Client) Result(connection FrontendClient, timestamp uint64) {
-	c.Timestamp.Increment() // Timestamp for sending request to front end.
+func (c *Client) result(connection FrontendClient, timestamp uint64) {
+	c.timestamp.Increment() // timestamp for sending request to front end.
 	c.logf("Sending result request to server.")
 	result, err := connection.Result(context.Background(), &Void{
 		SenderID:  &c.pid,
 		Timestamp: &timestamp,
 	})
 	if result != nil {
-		c.Timestamp.UpdateTime(result.GetTimestamp())
+		c.timestamp.UpdateTime(result.GetTimestamp())
 	}
-	c.Timestamp.Increment()
+	c.timestamp.Increment()
 
 	if err != nil {
 		c.fatal(err)
@@ -96,7 +96,7 @@ func (c *Client) Result(connection FrontendClient, timestamp uint64) {
 	}
 }
 
-func (c *Client) Bid(connection FrontendClient, timestamp uint64, arg *Argument) {
+func (c *Client) bid(connection FrontendClient, timestamp uint64, arg *Argument) {
 	response, err := connection.Bid(context.Background(), &BidRequest{
 		SenderID:  &c.pid,
 		Timestamp: &timestamp,
@@ -115,8 +115,8 @@ func (c *Client) Bid(connection FrontendClient, timestamp uint64, arg *Argument)
 	}
 }
 
-// ShutdownLogging closes the file which backs the logger.
-func (c *Client) ShutdownLogging(writer *os.File) {
+// shutdownLogging closes the file which backs the logger.
+func (c *Client) shutdownLogging(writer *os.File) {
 	c.logf("Client shut down.\n")
 	_ = writer.Close()
 }
@@ -124,7 +124,7 @@ func (c *Client) ShutdownLogging(writer *os.File) {
 // logf writes a message to the log file, appending a newline if necessary.
 // Mostly equivalent to log.Printf.
 func (c *Client) logf(format string, v ...any) {
-	prefix := fmt.Sprintf("Client %d. Time: %d. ", c.pid, c.Timestamp)
+	prefix := fmt.Sprintf("Client %d. Time: %d. ", c.pid, c.timestamp)
 	c.logger.SetPrefix(prefix)
 	text := fmt.Sprintf(format, v...)
 	if !(strings.HasSuffix(text, "\n") || strings.HasSuffix(text, "\r")) {

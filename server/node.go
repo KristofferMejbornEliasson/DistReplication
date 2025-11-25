@@ -22,32 +22,32 @@ import (
 type Server struct {
 	UnimplementedNodeServer
 	logger    *log.Logger
-	Timestamp *Lamport
-	Port      *int64
-	Nodes     []int64
+	timestamp *Lamport
+	port      *int64
+	nodes     []int64
 	auction   *Auction
 	isLeader  bool
 }
 
 func main() {
 	server := Server{
-		Timestamp: NewLamport(),
-		Port:      ParseArguments(os.Args),
+		timestamp: NewLamport(),
+		port:      parseArguments(os.Args),
 		isLeader:  false,
 	}
-	server.Nodes = setupOtherNodeList(*server.Port)
+	server.nodes = setupOtherNodeList(*server.port)
 
 	// Setup logging
 	file, err := os.Create("log.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
-	prefix := fmt.Sprintf("Node %d: ", *server.Port)
+	prefix := fmt.Sprintf("Node %d: ", *server.port)
 	server.logger = log.New(file, prefix, 0)
-	defer server.ShutdownLogging(file)
+	defer server.shutdownLogging(file)
 
 	// Setup listening
-	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", *server.Port))
+	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", *server.port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
@@ -57,7 +57,7 @@ func main() {
 
 	// Hard-codes node listening on port 5000 to be the primary replication manager
 	// upon start-up.
-	if *server.Port == 5000 {
+	if *server.port == 5000 {
 		server.isLeader = true
 	}
 	// Starts a new auction.
@@ -65,8 +65,8 @@ func main() {
 
 	// Listen to RPCs from frontend.
 	wait := make(chan struct{})
-	go server.Serve(grpcServer, lis, wait)
-	go server.ReadUserInput(wait)
+	go server.serve(grpcServer, lis, wait)
+	go server.readUserInput(wait)
 	for {
 		select {
 		case <-wait:
@@ -75,12 +75,12 @@ func main() {
 	}
 }
 
-// ReadUserInput runs constantly, reading the standard input.
+// readUserInput runs constantly, reading the standard input.
 // Breaks out when the user types "quit" or "exit".
 // Type 'start' to start a new 100-second auction if one isn't active.
-func (s *Server) ReadUserInput(wait chan struct{}) {
+func (s *Server) readUserInput(wait chan struct{}) {
 	reader := bufio.NewScanner(os.Stdin)
-	fmt.Printf("Node %d started.\n", *s.Port)
+	fmt.Printf("Node %d started.\n", *s.port)
 	s.logf("Node has begun listening to user input through standard input.")
 	for {
 		reader.Scan()
@@ -105,8 +105,8 @@ func (s *Server) ReadUserInput(wait chan struct{}) {
 	}
 }
 
-// Serve begins the server/service, allowing clients to execute its remote-procedure call functions.
-func (s *Server) Serve(server *grpc.Server, lis net.Listener, wait chan struct{}) {
+// serve begins the server/service, allowing clients to execute its remote-procedure call functions.
+func (s *Server) serve(server *grpc.Server, lis net.Listener, wait chan struct{}) {
 	err := server.Serve(lis)
 	if err != nil {
 		wait <- struct{}{}
@@ -115,15 +115,15 @@ func (s *Server) Serve(server *grpc.Server, lis net.Listener, wait chan struct{}
 	s.logf("Listening on %s.\n", lis.Addr())
 }
 
-// ShutdownLogging closes the file which backs the logger.
-func (s *Server) ShutdownLogging(writer *os.File) {
+// shutdownLogging closes the file which backs the logger.
+func (s *Server) shutdownLogging(writer *os.File) {
 	s.logf("Node shut down.\n")
 	_ = writer.Close()
 }
 
-// ParseArguments reads the command-line arguments and returns the port number specified
+// parseArguments reads the command-line arguments and returns the port number specified
 // therein.
-func ParseArguments(args []string) *int64 {
+func parseArguments(args []string) *int64 {
 	if len(args) != 2 {
 		throwParseException("Wrong number of arguments.")
 	}
@@ -143,9 +143,9 @@ func throwParseException(err string) {
 // register a new bid in the current auction.
 func (s *Server) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
 	s.logf("Received bid request from client %d.", msg.GetSenderID())
-	s.Timestamp.UpdateTime(*msg.Timestamp)
-	s.Timestamp.Increment() // Timestamp for receive event from frontend
-	timestamp := s.Timestamp.Now()
+	s.timestamp.UpdateTime(*msg.Timestamp)
+	s.timestamp.Increment() // timestamp for receive event from frontend
+	timestamp := s.timestamp.Now()
 	state := EAck_Exception
 	if s.auction != nil {
 		if s.auction.TryBid(msg.GetSenderID(), msg.GetAmount()) {
@@ -156,10 +156,10 @@ func (s *Server) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
 		}
 	}
 
-	s.Timestamp.Increment() // Timestamp for send event to frontend
-	timestamp = s.Timestamp.Now()
+	s.timestamp.Increment() // timestamp for send event to frontend
+	timestamp = s.timestamp.Now()
 	return &BidResponse{
-		SenderID:  s.Port,
+		SenderID:  s.port,
 		Timestamp: &timestamp,
 		Ack:       &state,
 	}, nil
@@ -168,11 +168,11 @@ func (s *Server) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
 // Result is the RPC executed when the client wishes to know the status of
 // the current or latest auction.
 func (s *Server) Result(_ context.Context, msg *Void) (*Outcome, error) {
-	s.Timestamp.UpdateTime(*msg.Timestamp)
-	s.Timestamp.Increment() // Timestamp for receive event from frontend.
+	s.timestamp.UpdateTime(*msg.Timestamp)
+	s.timestamp.Increment() // timestamp for receive event from frontend.
 	s.logf("Received Result request from client %d.", msg.GetSenderID())
 
-	s.Timestamp.Increment() // Timestamp for send event to frontend.
+	s.timestamp.Increment() // timestamp for send event to frontend.
 	if s.auction == nil {
 		s.logf("No auction exists. Responding to client.")
 	} else {
@@ -181,11 +181,11 @@ func (s *Server) Result(_ context.Context, msg *Void) (*Outcome, error) {
 	return s.generateOutcome(), nil
 }
 
-// updateBackups executes the Update RPC on each other replica manager in Server.Nodes.
+// updateBackups executes the Update RPC on each other replica manager in Server.nodes.
 // This is a synchronous operation.
 func (s *Server) updateBackups(requestID *string) {
 	outcome := s.generateOutcome()
-	for _, port := range s.Nodes {
+	for _, port := range s.nodes {
 		s.updateBackup(port, outcome, requestID)
 	}
 }
@@ -207,19 +207,19 @@ func (s *Server) updateBackup(targetPort int64, outcome *Outcome, requestID *str
 	}(conn)
 
 	client := NewNodeClient(conn)
-	s.Timestamp.Increment()
-	timestamp := s.Timestamp.Now()
+	s.timestamp.Increment()
+	timestamp := s.timestamp.Now()
 	outcome.Timestamp = &timestamp
 	response, err := client.Update(context.Background(), &UpdateQuery{
 		Outcome:   outcome,
 		RequestID: requestID,
 	})
 	if err != nil {
-		s.Timestamp.Increment()
+		s.timestamp.Increment()
 		s.logf("Could not update backup at port %d: %v", targetPort, err)
 	} else {
-		s.Timestamp.UpdateTime(*response.Timestamp)
-		s.Timestamp.Increment()
+		s.timestamp.UpdateTime(*response.Timestamp)
+		s.timestamp.Increment()
 		s.logf("Updated backup at port %d.", targetPort)
 	}
 }
@@ -227,7 +227,7 @@ func (s *Server) updateBackup(targetPort int64, outcome *Outcome, requestID *str
 // logf writes a message to the log file, appending a newline if necessary.
 // Mostly equivalent to log.Printf.
 func (s *Server) logf(format string, v ...any) {
-	prefix := fmt.Sprintf("Replica node %d. Time: %s. ", *s.Port, s.Timestamp)
+	prefix := fmt.Sprintf("Replica node %d. Time: %s. ", *s.port, s.timestamp)
 	s.logger.SetPrefix(prefix)
 	text := fmt.Sprintf(format, v...)
 	if !(strings.HasSuffix(text, "\n") || strings.HasSuffix(text, "\r")) {
@@ -266,9 +266,9 @@ func setupOtherNodeList(port int64) []int64 {
 // generateVoidMessage creates a Void struct, which contains information on the
 // sender and their current Lamport timestamp.
 func (s *Server) generateVoidMessage() *Void {
-	timestamp := s.Timestamp.Now()
+	timestamp := s.timestamp.Now()
 	return &Void{
-		SenderID:  s.Port,
+		SenderID:  s.port,
 		Timestamp: &timestamp,
 	}
 }
@@ -293,8 +293,8 @@ func (s *Server) startAuction() {
 // with changes to the Auction state.
 func (s *Server) Update(_ context.Context, msg *UpdateQuery) (*Void, error) {
 	outcome := msg.GetOutcome()
-	s.Timestamp.UpdateTime(outcome.GetTimestamp())
-	s.Timestamp.Increment() // Timestamp for receiving event
+	s.timestamp.UpdateTime(outcome.GetTimestamp())
+	s.timestamp.Increment() // timestamp for receiving event
 	s.logf("Received Update call from replica manager at port %d.", outcome.GetSenderID())
 
 	s.auction = Reconstruct(
@@ -303,7 +303,7 @@ func (s *Server) Update(_ context.Context, msg *UpdateQuery) (*Void, error) {
 		outcome.GetAuctionStartTime(),
 		outcome.GetAuctionEndTime())
 
-	s.Timestamp.Increment() // Timestamp for send event
+	s.timestamp.Increment() // timestamp for send event
 	s.logf("Responding to update from replica mananger at port %d.", outcome.GetSenderID())
 	return s.generateVoidMessage(), nil
 }
@@ -311,13 +311,13 @@ func (s *Server) Update(_ context.Context, msg *UpdateQuery) (*Void, error) {
 // generateOutcome generates an Outcome struct which contains information on the
 // current state of the Auction.
 func (s *Server) generateOutcome() *Outcome {
-	now := s.Timestamp.Now()
+	now := s.timestamp.Now()
 	var invalid int64 = math.MinInt64
 
 	// No auction exists.
 	if s.auction == nil {
 		return &Outcome{
-			SenderID:         s.Port,
+			SenderID:         s.port,
 			Timestamp:        &now,
 			AuctionStartTime: &invalid,
 			AuctionEndTime:   &invalid,
@@ -333,7 +333,7 @@ func (s *Server) generateOutcome() *Outcome {
 		leader = *s.auction.leadingID
 	}
 	return &Outcome{
-		SenderID:         s.Port,
+		SenderID:         s.port,
 		Timestamp:        &now,
 		AuctionStartTime: &start,
 		AuctionEndTime:   &end,
