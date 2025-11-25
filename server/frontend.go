@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 
+	"google.golang.org/grpc/credentials/insecure"
+
 	. "DistReplication/grpc"
 
 	"google.golang.org/grpc"
@@ -90,6 +92,17 @@ func (f *Frontend) ShutdownLogging(writer *os.File) {
 // Bid is the RPC executed when the client wants to register a new bid.
 func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
 	f.logf("Received bid request from client %d.", msg.GetSenderID())
+	conn, err := f.createConnection()
+	if err != nil {
+		f.logf("Error creating connection to server: %v", err)
+		return nil, err
+	}
+	defer func(conn *grpc.ClientConn) {
+		err := conn.Close()
+		if err != nil {
+			f.logf("Error closing connection:\n%v", err)
+		}
+	}(conn)
 	return nil, nil
 }
 
@@ -97,5 +110,25 @@ func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error)
 // current or latest Auction.
 func (f *Frontend) Result(_ context.Context, msg *Void) (*Outcome, error) {
 	f.logf("Received reply to critical area access request from node %d.", msg.GetSenderID())
+	conn, err := f.createConnection()
+	if err != nil {
+		f.logf("Error creating connection to server: %v", err)
+		return nil, err
+	}
+	defer func(conn *grpc.ClientConn) {
+		err := conn.Close()
+		if err != nil {
+			f.logf("Error closing connection:\n%v", err)
+		}
+	}(conn)
 	return nil, nil
+}
+
+// createConnection establishes a GRPC client connection. It is the caller's
+// responsibility to close it, and to check whether opening it was successful.
+func (f *Frontend) createConnection() (*grpc.ClientConn, error) {
+	var opts []grpc.DialOption
+	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	targetAddress := fmt.Sprintf("localhost:%d", f.primaryPort)
+	return grpc.NewClient(targetAddress, opts...)
 }
