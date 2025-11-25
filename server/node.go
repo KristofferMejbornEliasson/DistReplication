@@ -133,7 +133,8 @@ func ParseArguments(args []string) *int64 {
 	return &port
 }
 
-// Bid is the RPC executed when the caller wants access to the critical area.
+// Bid is the RPC executed when the frontend is forwarding a client request to
+// register a new bid in the current auction.
 func (s *Server) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
 	s.logf("Received bid request from client %d.", msg.GetSenderID())
 	s.Timestamp.UpdateTime(*msg.Timestamp)
