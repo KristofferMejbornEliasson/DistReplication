@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -80,12 +81,25 @@ func (s *Server) ReadUserInput(wait chan struct{}) {
 			s.logger.Fatalf("failed to call Read: %v", reader.Err())
 		}
 		text := reader.Text()
+		if text == "" {
+			continue
+		}
 		if text == "quit" || text == "exit" {
 			wait <- struct{}{}
 			break
 		}
-		if text == "" {
-			continue
+		if text == "start" {
+			if s.isLeader {
+				if s.auction == nil || s.auction.end.Before(time.Now()) {
+					s.auction = StartNewAuction(0)
+					s.logf("Started a new auction from %v to %v, with a starting bid of %d DKK.\n",
+						s.auction.start, s.auction.end, s.auction.leadingBid)
+				} else {
+					s.logf("Failed to start a new auction. One is already in progress.")
+				}
+			} else {
+				s.logf("Failed to start a new auction. This node is not the leader.")
+			}
 		}
 	}
 }
