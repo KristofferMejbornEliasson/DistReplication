@@ -88,6 +88,7 @@ func (s *Server) ReadUserInput(wait chan struct{}) {
 			s.logger.Fatalf("failed to call Read: %v", reader.Err())
 		}
 		text := reader.Text()
+		text = strings.ToLower(text)
 		if text == "" {
 			continue
 		}
@@ -97,6 +98,9 @@ func (s *Server) ReadUserInput(wait chan struct{}) {
 		}
 		if text == "start" {
 			s.startAuction()
+		}
+		if text == "state" || text == "auction" {
+			s.printAuction()
 		}
 	}
 }
@@ -130,12 +134,17 @@ func ParseArguments(args []string) *int64 {
 	return &port
 }
 
+func throwParseException(err string) {
+	const UsageText string = "Usage:\n\t./node <port>"
+	log.Fatalf("%s\n%s\n", err, UsageText)
+}
+
 // Bid is the RPC executed when the frontend is forwarding a client request to
 // register a new bid in the current auction.
 func (s *Server) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
 	s.logf("Received bid request from client %d.", msg.GetSenderID())
 	s.Timestamp.UpdateTime(*msg.Timestamp)
-	s.Timestamp.Increment()
+	s.Timestamp.Increment() // Timestamp for receive event from frontend
 	timestamp := s.Timestamp.Now()
 	state := EAck_Exception
 	if s.auction != nil {
@@ -146,6 +155,9 @@ func (s *Server) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
 			state = EAck_Fail
 		}
 	}
+
+	s.Timestamp.Increment() // Timestamp for send event to frontend
+	timestamp = s.Timestamp.Now()
 	return &BidResponse{
 		SenderID:  s.Port,
 		Timestamp: &timestamp,
@@ -157,10 +169,10 @@ func (s *Server) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
 // the current or latest auction.
 func (s *Server) Result(_ context.Context, msg *Void) (*Outcome, error) {
 	s.Timestamp.UpdateTime(*msg.Timestamp)
-	s.Timestamp.Increment() // Timestamp for receive event from client.
+	s.Timestamp.Increment() // Timestamp for receive event from frontend.
 	s.logf("Received Result request from client %d.", msg.GetSenderID())
 
-	s.Timestamp.Increment() // Timestamp for send event to client.
+	s.Timestamp.Increment() // Timestamp for send event to frontend.
 	if s.auction == nil {
 		s.logf("No auction exists. Responding to client.")
 	} else {
@@ -277,17 +289,13 @@ func (s *Server) startAuction() {
 	}
 }
 
-func throwParseException(err string) {
-	const UsageText string = "Usage:\n\t./node <port>"
-	log.Fatalf("%s\n%s\n", err, UsageText)
-}
-
 // Update is the RPC executed in a backup when the leader wishes to update it
 // with changes to the Auction state.
 func (s *Server) Update(_ context.Context, msg *UpdateQuery) (*Void, error) {
 	outcome := msg.GetOutcome()
 	s.Timestamp.UpdateTime(outcome.GetTimestamp())
 	s.Timestamp.Increment() // Timestamp for receiving event
+	s.logf("Received Update call from replica manager at port %d.", outcome.GetSenderID())
 
 	s.auction = Reconstruct(
 		outcome.LeadingBid,
@@ -296,6 +304,7 @@ func (s *Server) Update(_ context.Context, msg *UpdateQuery) (*Void, error) {
 		outcome.GetAuctionEndTime())
 
 	s.Timestamp.Increment() // Timestamp for send event
+	s.logf("Responding to update from replica mananger at port %d.", outcome.GetSenderID())
 	return s.generateVoidMessage(), nil
 }
 
@@ -330,5 +339,21 @@ func (s *Server) generateOutcome() *Outcome {
 		AuctionEndTime:   &end,
 		LeadingID:        &leader,
 		LeadingBid:       s.auction.leadingBid,
+	}
+}
+
+func (s *Server) printAuction() {
+	s.logf("Local command executed to print state to standard output:\n")
+	if s.auction == nil {
+		s.logf("No auction is running, nor has one ever run on the server.\n")
+		return
+	}
+
+	s.logf("Auction started at: %v\n", s.auction.start)
+	s.logf("Auction ended at: %v\n", s.auction.end)
+	if s.auction.leadingID == nil || *s.auction.leadingID == math.MinInt64 {
+		s.logf("No-one has bid on the auction so far.")
+	} else {
+		s.logf("Leading bid is %d,- by %d.\n", *s.auction.leadingBid, *s.auction.leadingID)
 	}
 }
