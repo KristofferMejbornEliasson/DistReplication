@@ -38,7 +38,7 @@ func main() {
 	server.nodes = setupOtherNodeList(*server.port)
 
 	// Setup logging
-	file, err := os.Create("log.txt")
+	file, err := os.OpenFile("log.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatal(err)
 	}
