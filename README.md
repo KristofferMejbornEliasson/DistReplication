@@ -1,35 +1,66 @@
-# DistEx
+# DistReplication
 
-Implementation of distributed mutual exclusion using the Ricart \& Agrawala
-algorithm.
+Implementation of distributed replication using active replication.
 
-To run, use the command
+There are three programmes; `client`, `frontent`, and (replica manager) `node`.
+Clients and nodes interact with the singular frontend which forwards requests/responses.
+
+## Compile
+
+A Makefile is included to make compilation easier. If you have some implementation
+of Make installed, you can compile the programmes by simply executing:
 
 ```
-go run node.go <PORT>
+make
 ```
 
-`<PORT>` should be replaced with the specific port you want to use for that node,
-either **5000**, **5001**, or **5002**.
+Alternatively, execute _each_ of the following three commands:
 
-You can also compile it to an executable with
 ```
-go build
-```
-and then run that with
-```
-./DistEx <PORT>
+go build -o client.exe client/client.go
 ```
 
-Each node should be opened in a separate terminal window. They do not all need
-to be open at once for the programme to function.
+```
+go build -o node.exe server/node.go server/auction.go
+```
 
-Once opened the node can write to the critical service (a shared plaintext file)
-by standard written inputs into the terminal.
+```
+go build -o frontend.exe server/frontend.go server/auction.go
+```
 
-To close the current node, input `quit` or `exit` into the terminal, or kill the
-process with Ctrl+C.
+## Run
 
+### Frontend
+To start the frontend, execute
+```
+./frontend
+```
+
+### Replica manager backend
+To start the replica managers, execute
+```
+./node <port>
+```
+
+where `<port>` is 5000, 5001, 5002, or 5003.
+Note that you should always have one node with the port 5000, as this is
+the primary replica manager.
+
+To close a replica manager, input `quit` or `exit` into the terminal, or kill the
+process with Ctrl+C.\
+To start a new auction in the primary replica manager, type in `start`.\
+To see the state of the current/latest auction, type in `state` or `auction`.
+
+### Client
+While the frontend is running (and ideally a replica manager, too),
+a client programme can be run by executing either
+```
+./client bid <amount>
+```
+or
+```
+./client result
+```
 
 
 
