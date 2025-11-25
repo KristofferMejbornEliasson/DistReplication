@@ -9,7 +9,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -22,7 +21,6 @@ import (
 type Server struct {
 	UnimplementedNodeServer
 	logger       *log.Logger
-	wg           *sync.WaitGroup
 	Timestamp    *Lamport
 	Port         *int64
 	Nodes        []int64
@@ -35,7 +33,6 @@ func main() {
 	server := Server{
 		Timestamp:    NewLamport(),
 		Port:         ParseArguments(os.Args),
-		wg:           &sync.WaitGroup{},
 		RequestQueue: make([]int64, 0),
 		isLeader:     false,
 	}
@@ -155,14 +152,25 @@ func (s *Server) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
 	}, nil
 }
 
-// Result is the RPC executed when the caller is finished in the critical area,
-// and found this node in its queue.
+// Result is the RPC executed when the client wishes to know the status of
+// the current or latest auction.
 func (s *Server) Result(_ context.Context, msg *Void) (*Outcome, error) {
-	s.wg.Done() // Decrements the wait-group's counter.
 	s.Timestamp.UpdateTime(*msg.Timestamp)
-	s.Timestamp.Increment()
-	s.logf("Received reply to critical area access request from node %d.", msg.GetSenderID())
-	return nil, nil
+	s.Timestamp.Increment() // Timestamp for receive event from client.
+	s.logf("Received Result request from client %d.", msg.GetSenderID())
+
+	s.Timestamp.Increment() // Timestamp for send event to client.
+	now := s.Timestamp.Now()
+	start := s.auction.start.Unix()
+	end := s.auction.end.Unix()
+	return &Outcome{
+		SenderID:         s.Port,
+		Timestamp:        &now,
+		AuctionStartTime: &start,
+		AuctionEndTime:   &end,
+		LeadingID:        s.auction.leadingID,
+		LeadingBid:       s.auction.leadingBid,
+	}, nil
 }
 
 // exit performs the necessary actions when leaving the critical section.

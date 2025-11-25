@@ -9,7 +9,7 @@ type Auction struct {
 	start      *time.Time // Point in time when auction starts
 	end        *time.Time // Point in time when auction ends
 	leadingBid *uint64    // Leading bid amount.
-	leadingId  *int64     // ID of leading bidder. Nil if no-one has bid
+	leadingID  *int64     // ID of leading bidder. Nil if no-one has bid
 	lock       *sync.Mutex
 }
 
@@ -30,7 +30,7 @@ func NewAuction(startingBid uint64, start time.Time, end time.Time) *Auction {
 		start:      &start,
 		end:        &end,
 		leadingBid: &startingBid,
-		leadingId:  nil,
+		leadingID:  nil,
 		lock:       &sync.Mutex{},
 	}
 }
@@ -64,7 +64,7 @@ func (a *Auction) TryBid(bidderID int64, amount uint64) bool {
 	defer a.lock.Unlock()
 	if a.isActive() && (a.leadingBid == nil || *a.leadingBid < amount) {
 		a.leadingBid = &amount
-		a.leadingId = &bidderID
+		a.leadingID = &bidderID
 		return true
 	}
 	return false
