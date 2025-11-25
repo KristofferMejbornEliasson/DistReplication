@@ -98,6 +98,7 @@ func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error)
 	if err != nil {
 		f.logf("Error creating connection to replica manager via port %d:\n%v",
 			f.primaryPort, err)
+		// TODO: Handle what to do when the primary replica manager is inaccessible.
 		return nil, err
 	}
 	defer func(conn *grpc.ClientConn) {
@@ -123,6 +124,7 @@ func (f *Frontend) Result(_ context.Context, msg *Void) (*Outcome, error) {
 	if err != nil {
 		f.logf("Error creating connection to replica manager via port %d:\n%v",
 			f.primaryPort, err)
+		// TODO: Handle what to do when the primary replica manager is inaccessible.
 		return nil, err
 	}
 	defer func(conn *grpc.ClientConn) {
