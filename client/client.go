@@ -24,7 +24,10 @@ type Client struct {
 }
 
 func main() {
-	c := Client{pid: int64(os.Getpid())}
+	c := Client{
+		pid:       int64(os.Getpid()),
+		Timestamp: time.NewLamport(),
+	}
 
 	file, err := os.Create("log.txt")
 	if err != nil {
@@ -68,7 +71,7 @@ func (c *Client) Result(connection FrontendClient, timestamp uint64) {
 		Timestamp: &timestamp,
 	})
 	if err != nil {
-		c.logger.Fatal(err)
+		c.log(err)
 	}
 	fmt.Printf("Auction started at: %d\n", result.GetAuctionStartTime())
 	fmt.Printf("Auction ended at: %d\n", result.GetAuctionStartTime())
@@ -82,7 +85,7 @@ func (c *Client) Bid(connection FrontendClient, timestamp uint64, arg *Argument)
 		Amount:    &arg.amount,
 	})
 	if err != nil {
-		c.logger.Fatal(err)
+		c.fatal(err)
 	}
 	switch response.GetAck() {
 	case EAck_Success:
@@ -106,11 +109,15 @@ func (c *Client) logf(format string, v ...any) {
 	prefix := fmt.Sprintf("Client %d. Time: %d. ", c.pid, c.Timestamp)
 	c.logger.SetPrefix(prefix)
 	text := fmt.Sprintf(format, v...)
-	if !(strings.HasSuffix(format, "\n") || strings.HasSuffix(format, "\r")) {
-		c.logger.Println(text)
-	} else {
-		c.logger.Print(text)
+	if !(strings.HasSuffix(text, "\n") || strings.HasSuffix(text, "\r")) {
+		text = text + "\n"
 	}
+	c.logger.Print(text)
+	fmt.Print(text)
+}
+
+func (c *Client) log(v ...any) {
+	c.logf("%v", v)
 }
 
 // fatalf writes a message to the log file (appending a newline if necessary),
@@ -119,6 +126,10 @@ func (c *Client) logf(format string, v ...any) {
 func (c *Client) fatalf(format string, v ...any) {
 	c.logf(format, v...)
 	os.Exit(1)
+}
+
+func (c *Client) fatal(v ...any) {
+	c.fatalf("%v", v)
 }
 
 // parseArguments parses the programme arguments and returns a struct containing
