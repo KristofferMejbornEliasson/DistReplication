@@ -1,13 +1,14 @@
 package main
 
 import (
-	. "DistReplication/grpc"
 	"context"
 	"fmt"
 	"log"
 	"net"
 	"os"
 	"strings"
+
+	. "DistReplication/grpc"
 
 	"google.golang.org/grpc"
 )
@@ -17,10 +18,13 @@ const FrontendPort = 4999
 type Frontend struct {
 	UnimplementedFrontendServer
 	logger *log.Logger
+	wait   chan struct{}
 }
 
 func main() {
-	frontend := Frontend{}
+	frontend := Frontend{
+		wait: make(chan struct{}),
+	}
 
 	file, err := os.Create("log.txt")
 	if err != nil {
@@ -44,6 +48,10 @@ func main() {
 	}
 	frontend.logf("Listening on %s.\n", lis.Addr())
 	for {
+		select {
+		case <-frontend.wait:
+			return
+		}
 	}
 }
 
