@@ -21,21 +21,19 @@ import (
 
 type Server struct {
 	UnimplementedNodeServer
-	logger       *log.Logger
-	Timestamp    *Lamport
-	Port         *int64
-	Nodes        []int64
-	RequestQueue []int64
-	auction      *Auction
-	isLeader     bool
+	logger    *log.Logger
+	Timestamp *Lamport
+	Port      *int64
+	Nodes     []int64
+	auction   *Auction
+	isLeader  bool
 }
 
 func main() {
 	server := Server{
-		Timestamp:    NewLamport(),
-		Port:         ParseArguments(os.Args),
-		RequestQueue: make([]int64, 0),
-		isLeader:     false,
+		Timestamp: NewLamport(),
+		Port:      ParseArguments(os.Args),
+		isLeader:  false,
 	}
 	server.Nodes = setupOtherNodeList(*server.Port)
 
@@ -192,14 +190,6 @@ func (s *Server) Result(_ context.Context, msg *Void) (*Outcome, error) {
 		LeadingID:        &leader,
 		LeadingBid:       s.auction.leadingBid,
 	}, nil
-}
-
-// exit performs the necessary actions when leaving the critical section.
-func (s *Server) exit() {
-	for _, targetPort := range s.RequestQueue {
-		s.reply(targetPort)
-	}
-	s.RequestQueue = s.RequestQueue[:0]
 }
 
 // reply sends the individual response to a target node after this node has finished
