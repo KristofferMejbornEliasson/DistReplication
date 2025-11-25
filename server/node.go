@@ -77,6 +77,7 @@ func main() {
 
 // ReadUserInput runs constantly, reading the standard input.
 // Breaks out when the user types "quit" or "exit".
+// Type 'start' to start a new 100-second auction if one isn't active.
 func (s *Server) ReadUserInput(wait chan struct{}) {
 	reader := bufio.NewScanner(os.Stdin)
 	fmt.Printf("Node %d started.\n", *s.Port)
