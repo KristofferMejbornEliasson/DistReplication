@@ -37,6 +37,7 @@ func main() {
 	}
 	server.Nodes = setupOtherNodeList(*server.Port)
 
+	// Setup logging
 	file, err := os.Create("log.txt")
 	if err != nil {
 		log.Fatal(err)
@@ -45,6 +46,7 @@ func main() {
 	server.logger = log.New(file, prefix, 0)
 	defer server.ShutdownLogging(file)
 
+	// Setup listening
 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", *server.Port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
@@ -53,7 +55,15 @@ func main() {
 	grpcServer := grpc.NewServer(opts...)
 	RegisterNodeServer(grpcServer, &server)
 
-	server.auction = StartNewAuction(0)
+	// Hard-codes node listening on port 5000 to be the primary replication manager
+	// upon start-up.
+	if *server.Port == 5000 {
+		server.isLeader = true
+	}
+	// Starts a new auction.
+	server.startAuction()
+
+	// Listen to RPCs from frontend.
 	wait := make(chan struct{})
 	go server.Serve(grpcServer, lis, wait)
 	go server.ReadUserInput(wait)
@@ -85,17 +95,7 @@ func (s *Server) ReadUserInput(wait chan struct{}) {
 			break
 		}
 		if text == "start" {
-			if s.isLeader {
-				if s.auction == nil || s.auction.end.Before(time.Now()) {
-					s.auction = StartNewAuction(0)
-					s.logf("Started a new auction from %v to %v, with a starting bid of %d DKK.\n",
-						s.auction.start, s.auction.end, s.auction.leadingBid)
-				} else {
-					s.logf("Failed to start a new auction. One is already in progress.")
-				}
-			} else {
-				s.logf("Failed to start a new auction. This node is not the leader.")
-			}
+			s.startAuction()
 		}
 	}
 }
@@ -260,6 +260,20 @@ func (s *Server) GenerateVoidMessage() *Void {
 	return &Void{
 		SenderID:  s.Port,
 		Timestamp: &timestamp,
+	}
+}
+
+func (s *Server) startAuction() {
+	if s.isLeader {
+		if s.auction == nil || s.auction.end.Before(time.Now()) {
+			s.auction = StartNewAuction(0)
+			s.logf("Started a new auction from %v to %v, with a starting bid of %d DKK.\n",
+				s.auction.start, s.auction.end, s.auction.leadingBid)
+		} else {
+			s.logf("Failed to start a new auction. One is already in progress.")
+		}
+	} else {
+		s.logf("Failed to start a new auction. This node is not the leader.")
 	}
 }
 
