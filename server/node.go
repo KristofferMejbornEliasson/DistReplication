@@ -72,7 +72,7 @@ func main() {
 // Breaks out when the user types "quit" or "exit".
 func (s *Server) ReadUserInput(wait chan struct{}) {
 	reader := bufio.NewScanner(os.Stdin)
-	fmt.Printf("Node %d started. Enter messages to store in shared file:\n", *s.Port)
+	fmt.Printf("Node %d started.\n", *s.Port)
 	s.logf("Node has begun listening to user input through standard input.")
 	for {
 		reader.Scan()
@@ -110,11 +110,11 @@ func (s *Server) ShutdownLogging(writer *os.File) {
 // therein.
 func ParseArguments(args []string) *int64 {
 	if len(args) != 2 {
-		log.Fatal("Wrong number of arguments.\nUsage:\n\tgo run . <port>\n\t./node <port>")
+		throwParseException("Wrong number of arguments.")
 	}
 	port, err := strconv.ParseInt(args[1], 10, 16)
 	if err != nil {
-		log.Fatal("Couldn't parse argument as a number.\nUsage:\n\tgo run . <port>\n\t./node <port>")
+		throwParseException("Could not parse argument as a port number.")
 	}
 	return &port
 }
@@ -186,8 +186,10 @@ func (s *Server) logf(format string, v ...any) {
 	text := fmt.Sprintf(format, v...)
 	if !(strings.HasSuffix(format, "\n") || strings.HasSuffix(format, "\r")) {
 		s.logger.Println(text)
+		fmt.Println(text)
 	} else {
 		s.logger.Print(text)
+		fmt.Print(text)
 	}
 }
 
@@ -215,4 +217,9 @@ func (s *Server) GenerateVoidMessage() *Void {
 		SenderID:  s.Port,
 		Timestamp: &timestamp,
 	}
+}
+
+func throwParseException(err string) {
+	const UsageText string = "Usage:\n\t./node <port>"
+	log.Fatalf("%s\n%s\n", err, UsageText)
 }
