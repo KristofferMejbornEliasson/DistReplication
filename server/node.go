@@ -18,14 +18,6 @@ import (
 	. "DistReplication/time"
 )
 
-type eCriticalSystemState uint8
-
-const (
-	RELEASED eCriticalSystemState = iota
-	WANTED   eCriticalSystemState = iota
-	HELD     eCriticalSystemState = iota
-)
-
 type Server struct {
 	UnimplementedNodeServer
 	logger       *log.Logger
@@ -33,7 +25,6 @@ type Server struct {
 	Timestamp    *Lamport
 	Port         *int64
 	Nodes        []int64
-	State        eCriticalSystemState
 	RequestQueue []int64
 	auction      *Auction
 	isLeader     bool
@@ -44,7 +35,6 @@ func main() {
 		Timestamp:    new(Lamport),
 		Port:         ParseArguments(os.Args),
 		wg:           &sync.WaitGroup{},
-		State:        RELEASED,
 		RequestQueue: make([]int64, 0),
 		isLeader:     false,
 	}
@@ -159,7 +149,6 @@ func (s *Server) Result(_ context.Context, msg *Void) (*Outcome, error) {
 
 // exit performs the necessary actions when leaving the critical section.
 func (s *Server) exit() {
-	s.State = RELEASED
 	for _, targetPort := range s.RequestQueue {
 		s.reply(targetPort)
 	}
