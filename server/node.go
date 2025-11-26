@@ -60,8 +60,6 @@ func main() {
 	grpcServer := grpc.NewServer(opts...)
 	RegisterNodeServer(grpcServer, &server)
 
-	// Hard-codes node listening on port 5000 to be the primary replication manager
-	// upon start-up.
 	server.electLeader()
 
 	// Starts a new auction.
@@ -76,6 +74,7 @@ func main() {
 		})
 	} else {
 		server.timer = time.AfterFunc(40*time.Second, func() {
+			server.nodes = server.nodes[1:]
 			server.electLeader()
 			timerLoop <- struct{}{}
 		})
@@ -95,6 +94,7 @@ func main() {
 				})
 			} else {
 				server.timer = time.AfterFunc(40*time.Second, func() {
+					server.nodes = server.nodes[1:]
 					server.electLeader()
 					timerLoop <- struct{}{}
 				})
@@ -107,9 +107,13 @@ func main() {
 
 func (s *Server) electLeader() {
 	s.logf("Electing leader.")
-	OtherMin := min(s.nodes[0], s.nodes[1], s.nodes[2])
-	if *s.port < OtherMin {
+
+	if (len(s.nodes) >= 1 && *s.port < s.nodes[0]) || (len(s.nodes) == 0) {
+		s.logf("This node is the new leader.")
 		s.isLeader = true
+
+		s.informFrontendOfNewLeader()
+
 		for _, port := range s.nodes {
 			var opts []grpc.DialOption
 			opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -140,6 +144,8 @@ func (s *Server) electLeader() {
 				}
 			}
 		}
+	} else {
+		s.logf("This node is not the leader.")
 	}
 }
 
@@ -496,4 +502,38 @@ func (s *Server) Ping(_ context.Context, void *Void) (*Void, error) {
 		SenderID:  s.port,
 		Timestamp: &now,
 	}, nil
+}
+
+func (s *Server) informFrontendOfNewLeader() {
+	s.timestamp.Increment()
+	s.logf("Informing frontend that this node is the new leader.\n")
+
+	var opts []grpc.DialOption
+	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	targetAddress := fmt.Sprintf("localhost:%d", 4999)
+	conn, err := grpc.NewClient(targetAddress, opts...)
+	if err != nil {
+		s.logf("Failed to dial: %v", err)
+	}
+	grpcClient := NewFrontendMaintenanceClient(conn)
+	s.timestamp.Increment() // timestamp for send event
+	now := s.timestamp.Now()
+	response, rpcerr := grpcClient.ChangePrimary(context.Background(), &Void{
+		SenderID:  s.port,
+		Timestamp: &now,
+	})
+	if response != nil {
+		s.timestamp.UpdateTime(response.GetTimestamp())
+	}
+	s.timestamp.Increment() // Timestamp for receive event
+
+	if rpcerr != nil {
+		s.logf("Failed to inform frontend at port %d of new primary replica manager.", 4999)
+	} else {
+		s.logf("Received response from frontend about the new primary replica manager.")
+		err = conn.Close()
+		if err != nil {
+			s.logf("Error closing connection:\n%v", err)
+		}
+	}
 }
