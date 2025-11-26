@@ -23,6 +23,7 @@ func Reconstruct(leadingBid *uint64, leadingID *int64, startUnix int64, endUnix 
 		end:        &end,
 		leadingBid: leadingBid,
 		leadingID:  leadingID,
+		lock:       &sync.Mutex{},
 	}
 }
 
