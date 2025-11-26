@@ -410,7 +410,7 @@ const file_grpc_auction_proto_rawDesc = "" +
 	"\tleadingID\x18\x04 \x01(\x03R\tleadingID\x12*\n" +
 	"\x10auctionStartTime\x18\x05 \x01(\x03R\x10auctionStartTime\x12&\n" +
 	"\x0eauctionEndTime\x18\x06 \x01(\x03R\x0eauctionEndTime\"@\n" +
-	"\x04void\x12\x1a\n" +
+	"\x04Void\x12\x1a\n" +
 	"\bsenderID\x18\x01 \x01(\x03R\bsenderID\x12\x1c\n" +
 	"\ttimestamp\x18\x02 \x01(\x04R\ttimestamp\"O\n" +
 	"\vUpdateQuery\x12\"\n" +
@@ -422,13 +422,15 @@ const file_grpc_auction_proto_rawDesc = "" +
 	"\aSuccess\x10\x022\x9a\x01\n" +
 	"\x04Node\x12\"\n" +
 	"\x03Bid\x12\v.BidRequest\x1a\f.BidResponse\"\x00\x12\x1b\n" +
-	"\x06Result\x12\x05.void\x1a\b.Outcome\"\x00\x12\x16\n" +
-	"\x04Ping\x12\x05.void\x1a\x05.void\"\x00\x12\x1f\n" +
-	"\x06Update\x12\f.UpdateQuery\x1a\x05.void\"\x00\x12\x18\n" +
-	"\x06Demote\x12\x05.void\x1a\x05.void\"\x002K\n" +
+	"\x06Result\x12\x05.Void\x1a\b.Outcome\"\x00\x12\x16\n" +
+	"\x04Ping\x12\x05.Void\x1a\x05.Void\"\x00\x12\x1f\n" +
+	"\x06Update\x12\f.UpdateQuery\x1a\x05.Void\"\x00\x12\x18\n" +
+	"\x06Demote\x12\x05.Void\x1a\x05.Void\"\x002K\n" +
 	"\bFrontend\x12\"\n" +
 	"\x03Bid\x12\v.BidRequest\x1a\f.BidResponse\"\x00\x12\x1b\n" +
-	"\x06Result\x12\x05.void\x1a\b.Outcome\"\x00B\vZ\t./auctionb\beditionsp\xe8\a"
+	"\x06Result\x12\x05.Void\x1a\b.Outcome\"\x0024\n" +
+	"\x13FrontendMaintenance\x12\x1d\n" +
+	"\rChangePrimary\x12\x05.Void\x1a\x05.VoidB\vZ\t./auctionb\beditionsp\xe8\a"
 
 var (
 	file_grpc_auction_proto_rawDescOnce sync.Once
@@ -449,31 +451,33 @@ var file_grpc_auction_proto_goTypes = []any{
 	(*BidRequest)(nil),  // 1: BidRequest
 	(*BidResponse)(nil), // 2: BidResponse
 	(*Outcome)(nil),     // 3: Outcome
-	(*Void)(nil),        // 4: void
+	(*Void)(nil),        // 4: Void
 	(*UpdateQuery)(nil), // 5: UpdateQuery
 }
 var file_grpc_auction_proto_depIdxs = []int32{
-	0, // 0: BidResponse.ack:type_name -> eAck
-	3, // 1: UpdateQuery.outcome:type_name -> Outcome
-	1, // 2: Node.Bid:input_type -> BidRequest
-	4, // 3: Node.Result:input_type -> void
-	4, // 4: Node.Ping:input_type -> void
-	5, // 5: Node.Update:input_type -> UpdateQuery
-	4, // 6: Node.Demote:input_type -> void
-	1, // 7: Frontend.Bid:input_type -> BidRequest
-	4, // 8: Frontend.Result:input_type -> void
-	2, // 9: Node.Bid:output_type -> BidResponse
-	3, // 10: Node.Result:output_type -> Outcome
-	4, // 11: Node.Ping:output_type -> void
-	4, // 12: Node.Update:output_type -> void
-	4, // 13: Node.Demote:output_type -> void
-	2, // 14: Frontend.Bid:output_type -> BidResponse
-	3, // 15: Frontend.Result:output_type -> Outcome
-	9, // [9:16] is the sub-list for method output_type
-	2, // [2:9] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0,  // 0: BidResponse.ack:type_name -> eAck
+	3,  // 1: UpdateQuery.outcome:type_name -> Outcome
+	1,  // 2: Node.Bid:input_type -> BidRequest
+	4,  // 3: Node.Result:input_type -> Void
+	4,  // 4: Node.Ping:input_type -> Void
+	5,  // 5: Node.Update:input_type -> UpdateQuery
+	4,  // 6: Node.Demote:input_type -> Void
+	1,  // 7: Frontend.Bid:input_type -> BidRequest
+	4,  // 8: Frontend.Result:input_type -> Void
+	4,  // 9: FrontendMaintenance.ChangePrimary:input_type -> Void
+	2,  // 10: Node.Bid:output_type -> BidResponse
+	3,  // 11: Node.Result:output_type -> Outcome
+	4,  // 12: Node.Ping:output_type -> Void
+	4,  // 13: Node.Update:output_type -> Void
+	4,  // 14: Node.Demote:output_type -> Void
+	2,  // 15: Frontend.Bid:output_type -> BidResponse
+	3,  // 16: Frontend.Result:output_type -> Outcome
+	4,  // 17: FrontendMaintenance.ChangePrimary:output_type -> Void
+	10, // [10:18] is the sub-list for method output_type
+	2,  // [2:10] is the sub-list for method input_type
+	2,  // [2:2] is the sub-list for extension type_name
+	2,  // [2:2] is the sub-list for extension extendee
+	0,  // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_grpc_auction_proto_init() }
@@ -489,7 +493,7 @@ func file_grpc_auction_proto_init() {
 			NumEnums:      1,
 			NumMessages:   5,
 			NumExtensions: 0,
-			NumServices:   2,
+			NumServices:   3,
 		},
 		GoTypes:           file_grpc_auction_proto_goTypes,
 		DependencyIndexes: file_grpc_auction_proto_depIdxs,

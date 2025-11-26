@@ -4,15 +4,19 @@ option go_package = "./auction";
 
 service Node {
   rpc Bid(BidRequest) returns (BidResponse) {}
-  rpc Result(void) returns (Outcome) {}
-  rpc Ping(void) returns (void) {}
-  rpc Update(UpdateQuery) returns (void) {}
-  rpc Demote(void) returns (void) {}
+  rpc Result(Void) returns (Outcome) {}
+  rpc Ping(Void) returns (Void) {}
+  rpc Update(UpdateQuery) returns (Void) {}
+  rpc Demote(Void) returns (Void) {}
 }
 
 service Frontend {
   rpc Bid(BidRequest) returns (BidResponse) {}
-  rpc Result(void) returns (Outcome) {}
+  rpc Result(Void) returns (Outcome) {}
+}
+
+service FrontendMaintenance {
+  rpc ChangePrimary(Void) returns (Void);
 }
 
 message BidRequest {
@@ -43,7 +47,7 @@ message Outcome {
   int64 auctionEndTime = 6;
 }
 
-message void {
+message Void {
   int64 senderID = 1;
   uint64 timestamp = 2;
 }

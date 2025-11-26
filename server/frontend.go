@@ -18,10 +18,11 @@ import (
 	"google.golang.org/grpc"
 )
 
-const FrontendPort = 4999
+const FrontendPort int64 = 4999
 
 type Frontend struct {
 	UnimplementedFrontendServer
+	UnimplementedFrontendMaintenanceServer
 	logger      *log.Logger
 	wait        chan struct{}
 	primaryPort int64
@@ -52,6 +53,7 @@ func main() {
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
 	RegisterFrontendServer(grpcServer, &frontend)
+	RegisterFrontendMaintenanceServer(grpcServer, &frontend)
 
 	// Start listening
 	frontend.logf("Starting listening on %s.", lis.Addr())
@@ -214,6 +216,21 @@ func (f *Frontend) Result(_ context.Context, msg *Void) (*Outcome, error) {
 	f.timestamp.Increment() // timestamp for send event (to client)
 	f.logf("Forwarding outcome back to client %d.", msg.GetSenderID())
 	return outcome, err
+}
+
+func (f *Frontend) ChangePrimary(_ context.Context, msg *Void) (*Void, error) {
+	f.timestamp.UpdateTime(*msg.Timestamp)
+	f.timestamp.Increment()
+	f.logf("Received a UpdatePrimary request from replica manager at port %d.", msg.GetSenderID())
+	f.primaryPort = msg.GetSenderID()
+	f.timestamp.Increment()
+	f.logf("Responding to UpdatePrimary request from replica manager at port %d.", msg.GetSenderID())
+	now := f.timestamp.Now()
+	this := FrontendPort
+	return &Void{
+		SenderID:  &this,
+		Timestamp: &now,
+	}, nil
 }
 
 // createConnection establishes a GRPC client connection. It is the caller's

@@ -411,3 +411,105 @@ var Frontend_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "grpc/auction.proto",
 }
+
+const (
+	FrontendMaintenance_ChangePrimary_FullMethodName = "/FrontendMaintenance/ChangePrimary"
+)
+
+// FrontendMaintenanceClient is the client API for FrontendMaintenance service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type FrontendMaintenanceClient interface {
+	ChangePrimary(ctx context.Context, in *Void, opts ...grpc.CallOption) (*Void, error)
+}
+
+type frontendMaintenanceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewFrontendMaintenanceClient(cc grpc.ClientConnInterface) FrontendMaintenanceClient {
+	return &frontendMaintenanceClient{cc}
+}
+
+func (c *frontendMaintenanceClient) ChangePrimary(ctx context.Context, in *Void, opts ...grpc.CallOption) (*Void, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Void)
+	err := c.cc.Invoke(ctx, FrontendMaintenance_ChangePrimary_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// FrontendMaintenanceServer is the server API for FrontendMaintenance service.
+// All implementations must embed UnimplementedFrontendMaintenanceServer
+// for forward compatibility.
+type FrontendMaintenanceServer interface {
+	ChangePrimary(context.Context, *Void) (*Void, error)
+	mustEmbedUnimplementedFrontendMaintenanceServer()
+}
+
+// UnimplementedFrontendMaintenanceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedFrontendMaintenanceServer struct{}
+
+func (UnimplementedFrontendMaintenanceServer) ChangePrimary(context.Context, *Void) (*Void, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ChangePrimary not implemented")
+}
+func (UnimplementedFrontendMaintenanceServer) mustEmbedUnimplementedFrontendMaintenanceServer() {}
+func (UnimplementedFrontendMaintenanceServer) testEmbeddedByValue()                             {}
+
+// UnsafeFrontendMaintenanceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to FrontendMaintenanceServer will
+// result in compilation errors.
+type UnsafeFrontendMaintenanceServer interface {
+	mustEmbedUnimplementedFrontendMaintenanceServer()
+}
+
+func RegisterFrontendMaintenanceServer(s grpc.ServiceRegistrar, srv FrontendMaintenanceServer) {
+	// If the following call pancis, it indicates UnimplementedFrontendMaintenanceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&FrontendMaintenance_ServiceDesc, srv)
+}
+
+func _FrontendMaintenance_ChangePrimary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Void)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FrontendMaintenanceServer).ChangePrimary(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FrontendMaintenance_ChangePrimary_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FrontendMaintenanceServer).ChangePrimary(ctx, req.(*Void))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// FrontendMaintenance_ServiceDesc is the grpc.ServiceDesc for FrontendMaintenance service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var FrontendMaintenance_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "FrontendMaintenance",
+	HandlerType: (*FrontendMaintenanceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ChangePrimary",
+			Handler:    _FrontendMaintenance_ChangePrimary_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "grpc/auction.proto",
+}
