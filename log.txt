@@ -1,0 +1,9 @@
+Frontend at time &{0 824634297216}: Starting listening on 127.0.0.1:4999.
+Replica node 5000. Time: 0. Failed to Demote: rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing: dial tcp 127.0.0.1:5001: connectex: No connection could be made because the target machine actively refused it."
+Replica node 5000. Time: 0. Failed to Demote: rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing: dial tcp 127.0.0.1:5002: connectex: No connection could be made because the target machine actively refused it."
+Replica node 5000. Time: 0. Failed to Demote: rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing: dial tcp 127.0.0.1:5003: connectex: No connection could be made because the target machine actively refused it."
+Replica node 5000. Time: 0. Started a new auction from 2025-11-26 17:05:28.8142652 +0100 CET m=+0.058742401 to 2025-11-26 17:07:08.8142652 +0100 CET m=+100.058742401, with a starting bid of 824633766416 DKK.
+Replica node 5001. Time: 0. Failed to start a new auction. This node is not the leader.
+Replica node 5000. Time: 0. Failed to Demote: rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing: dial tcp 127.0.0.1:5001: connectex: No connection could be made because the target machine actively refused it."
+Replica node 5000. Time: 0. Failed to Demote: rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing: dial tcp 127.0.0.1:5002: connectex: No connection could be made because the target machine actively refused it."
+Replica node 5000. Time: 0. Failed to Demote: rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing: dial tcp 127.0.0.1:5003: connectex: No connection could be made because the target machine actively refused it."

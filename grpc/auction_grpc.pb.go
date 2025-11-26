@@ -23,6 +23,7 @@ const (
 	Node_Result_FullMethodName = "/Node/Result"
 	Node_Ping_FullMethodName   = "/Node/Ping"
 	Node_Update_FullMethodName = "/Node/Update"
+	Node_Demote_FullMethodName = "/Node/Demote"
 )
 
 // NodeClient is the client API for Node service.
@@ -33,6 +34,7 @@ type NodeClient interface {
 	Result(ctx context.Context, in *Void, opts ...grpc.CallOption) (*Outcome, error)
 	Ping(ctx context.Context, in *Void, opts ...grpc.CallOption) (*Void, error)
 	Update(ctx context.Context, in *UpdateQuery, opts ...grpc.CallOption) (*Void, error)
+	Demote(ctx context.Context, in *Void, opts ...grpc.CallOption) (*Void, error)
 }
 
 type nodeClient struct {
@@ -83,6 +85,16 @@ func (c *nodeClient) Update(ctx context.Context, in *UpdateQuery, opts ...grpc.C
 	return out, nil
 }
 
+func (c *nodeClient) Demote(ctx context.Context, in *Void, opts ...grpc.CallOption) (*Void, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Void)
+	err := c.cc.Invoke(ctx, Node_Demote_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // NodeServer is the server API for Node service.
 // All implementations must embed UnimplementedNodeServer
 // for forward compatibility.
@@ -91,6 +103,7 @@ type NodeServer interface {
 	Result(context.Context, *Void) (*Outcome, error)
 	Ping(context.Context, *Void) (*Void, error)
 	Update(context.Context, *UpdateQuery) (*Void, error)
+	Demote(context.Context, *Void) (*Void, error)
 	mustEmbedUnimplementedNodeServer()
 }
 
@@ -112,6 +125,9 @@ func (UnimplementedNodeServer) Ping(context.Context, *Void) (*Void, error) {
 }
 func (UnimplementedNodeServer) Update(context.Context, *UpdateQuery) (*Void, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
+}
+func (UnimplementedNodeServer) Demote(context.Context, *Void) (*Void, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Demote not implemented")
 }
 func (UnimplementedNodeServer) mustEmbedUnimplementedNodeServer() {}
 func (UnimplementedNodeServer) testEmbeddedByValue()              {}
@@ -206,6 +222,24 @@ func _Node_Update_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Node_Demote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Void)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NodeServer).Demote(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Node_Demote_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NodeServer).Demote(ctx, req.(*Void))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Node_ServiceDesc is the grpc.ServiceDesc for Node service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -228,6 +262,10 @@ var Node_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Update",
 			Handler:    _Node_Update_Handler,
+		},
+		{
+			MethodName: "Demote",
+			Handler:    _Node_Demote_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

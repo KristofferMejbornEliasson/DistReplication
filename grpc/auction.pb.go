@@ -419,12 +419,13 @@ const file_grpc_auction_proto_rawDesc = "" +
 	"\x04eAck\x12\r\n" +
 	"\tException\x10\x00\x12\b\n" +
 	"\x04Fail\x10\x01\x12\v\n" +
-	"\aSuccess\x10\x022\x80\x01\n" +
+	"\aSuccess\x10\x022\x9a\x01\n" +
 	"\x04Node\x12\"\n" +
 	"\x03Bid\x12\v.BidRequest\x1a\f.BidResponse\"\x00\x12\x1b\n" +
 	"\x06Result\x12\x05.void\x1a\b.Outcome\"\x00\x12\x16\n" +
 	"\x04Ping\x12\x05.void\x1a\x05.void\"\x00\x12\x1f\n" +
-	"\x06Update\x12\f.UpdateQuery\x1a\x05.void\"\x002K\n" +
+	"\x06Update\x12\f.UpdateQuery\x1a\x05.void\"\x00\x12\x18\n" +
+	"\x06Demote\x12\x05.void\x1a\x05.void\"\x002K\n" +
 	"\bFrontend\x12\"\n" +
 	"\x03Bid\x12\v.BidRequest\x1a\f.BidResponse\"\x00\x12\x1b\n" +
 	"\x06Result\x12\x05.void\x1a\b.Outcome\"\x00B\vZ\t./auctionb\beditionsp\xe8\a"
@@ -458,16 +459,18 @@ var file_grpc_auction_proto_depIdxs = []int32{
 	4, // 3: Node.Result:input_type -> void
 	4, // 4: Node.Ping:input_type -> void
 	5, // 5: Node.Update:input_type -> UpdateQuery
-	1, // 6: Frontend.Bid:input_type -> BidRequest
-	4, // 7: Frontend.Result:input_type -> void
-	2, // 8: Node.Bid:output_type -> BidResponse
-	3, // 9: Node.Result:output_type -> Outcome
-	4, // 10: Node.Ping:output_type -> void
-	4, // 11: Node.Update:output_type -> void
-	2, // 12: Frontend.Bid:output_type -> BidResponse
-	3, // 13: Frontend.Result:output_type -> Outcome
-	8, // [8:14] is the sub-list for method output_type
-	2, // [2:8] is the sub-list for method input_type
+	4, // 6: Node.Demote:input_type -> void
+	1, // 7: Frontend.Bid:input_type -> BidRequest
+	4, // 8: Frontend.Result:input_type -> void
+	2, // 9: Node.Bid:output_type -> BidResponse
+	3, // 10: Node.Result:output_type -> Outcome
+	4, // 11: Node.Ping:output_type -> void
+	4, // 12: Node.Update:output_type -> void
+	4, // 13: Node.Demote:output_type -> void
+	2, // 14: Frontend.Bid:output_type -> BidResponse
+	3, // 15: Frontend.Result:output_type -> Outcome
+	9, // [9:16] is the sub-list for method output_type
+	2, // [2:9] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name
 	2, // [2:2] is the sub-list for extension extendee
 	0, // [0:2] is the sub-list for field type_name

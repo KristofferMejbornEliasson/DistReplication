@@ -27,6 +27,7 @@ type Server struct {
 	nodes     []int64
 	auction   *Auction
 	isLeader  bool
+	timer     *time.Timer
 }
 
 func main() {
@@ -34,6 +35,7 @@ func main() {
 		timestamp: NewLamport(),
 		port:      parseArguments(os.Args),
 		isLeader:  false,
+		timer:     time.NewTimer(40 * time.Second),
 	}
 	server.nodes = setupOtherNodeList(*server.port)
 
@@ -57,20 +59,86 @@ func main() {
 
 	// Hard-codes node listening on port 5000 to be the primary replication manager
 	// upon start-up.
-	if *server.port == 5000 {
-		server.isLeader = true
-	}
+	server.electLeader()
+
 	// Starts a new auction.
-	server.startAuction()
+	timerLoop := make(chan struct{})
+	wait := make(chan struct{})
+	timerLoop <- struct{}{}
 
 	// Listen to RPCs from frontend.
-	wait := make(chan struct{})
 	go server.serve(grpcServer, lis, wait)
 	go server.readUserInput(wait)
+
 	for {
 		select {
+		case <-timerLoop:
+			if server.isLeader {
+				go time.AfterFunc(20*time.Second, func() {
+					server.heartBeatPing()
+					timerLoop <- struct{}{}
+				})
+			} else {
+				server.timer = time.AfterFunc(40*time.Second, func() {
+					server.electLeader()
+					timerLoop <- struct{}{}
+				})
+			}
 		case <-wait:
 			return
+		}
+	}
+}
+
+func (s *Server) electLeader() {
+	OtherMin := min(s.nodes[0], s.nodes[1], s.nodes[2])
+	if *s.port < OtherMin {
+		s.isLeader = true
+		for _, port := range s.nodes {
+			var opts []grpc.DialOption
+			opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+			targetAddress := fmt.Sprintf("localhost:%d", port)
+			conn, err := grpc.NewClient(targetAddress, opts...)
+			if err != nil {
+				s.logger.Fatalf("Failed to dial: %v", err)
+			}
+			grpcClient := NewNodeClient(conn)
+			_, rpcerr := grpcClient.Demote(context.Background(), &Void{})
+			if rpcerr != nil {
+				s.logf("Failed to Demote: %v", rpcerr)
+			} else {
+				err = conn.Close()
+				if err != nil {
+					s.logf("Error closing connection:\n%v", err)
+				}
+			}
+		}
+	}
+}
+
+func (s *Server) Demote(_ context.Context, _ *Void) (*Void, error) {
+	s.isLeader = false
+	return &Void{}, nil
+}
+
+func (s *Server) heartBeatPing() {
+	for _, port := range s.nodes {
+		var opts []grpc.DialOption
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		targetAddress := fmt.Sprintf("localhost:%d", port)
+		conn, err := grpc.NewClient(targetAddress, opts...)
+		if err != nil {
+			s.logger.Fatalf("Failed to dial: %v", err)
+		}
+		grpcClient := NewNodeClient(conn)
+		_, rpcerr := grpcClient.Ping(context.Background(), &Void{})
+		if rpcerr != nil {
+			s.logf("Failed to Demote: %v", rpcerr)
+		} else {
+			err = conn.Close()
+			if err != nil {
+				s.logf("Error closing connection:\n%v", err)
+			}
 		}
 	}
 }
@@ -356,4 +424,11 @@ func (s *Server) printAuction() {
 	} else {
 		s.logf("Leading bid is %d,- by %d.\n", *s.auction.leadingBid, *s.auction.leadingID)
 	}
+}
+
+func (s *Server) Ping(_ context.Context, void *Void) (*Void, error) {
+	if s.timer != nil {
+		s.timer.Reset(40 * time.Second)
+	}
+	return &Void{}, nil
 }

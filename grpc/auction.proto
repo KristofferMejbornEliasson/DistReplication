@@ -7,6 +7,7 @@ service Node {
   rpc Result(void) returns (Outcome) {}
   rpc Ping(void) returns (void) {}
   rpc Update(UpdateQuery) returns (void) {}
+  rpc Demote(void) returns (void) {}
 }
 
 service Frontend {
