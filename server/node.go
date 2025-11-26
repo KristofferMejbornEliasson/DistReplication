@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -21,21 +22,23 @@ import (
 
 type Server struct {
 	UnimplementedNodeServer
-	logger    *log.Logger
-	timestamp *Lamport
-	port      *int64
-	nodes     []int64
-	auction   *Auction
-	isLeader  bool
-	timer     *time.Timer
+	logger     *log.Logger
+	timestamp  *Lamport
+	port       *int64
+	nodes      []int64
+	auction    *Auction
+	isLeader   bool
+	timer      *time.Timer
+	updateLock *sync.Mutex
 }
 
 func main() {
 	server := Server{
-		timestamp: NewLamport(),
-		port:      parseArguments(os.Args),
-		isLeader:  false,
-		timer:     time.NewTimer(40 * time.Second),
+		timestamp:  NewLamport(),
+		port:       parseArguments(os.Args),
+		isLeader:   false,
+		timer:      time.NewTimer(40 * time.Second),
+		updateLock: &sync.Mutex{},
 	}
 	server.nodes = setupOtherNodeList(*server.port)
 
@@ -64,7 +67,17 @@ func main() {
 	// Starts a new auction.
 	timerLoop := make(chan struct{})
 	wait := make(chan struct{})
-	timerLoop <- struct{}{}
+	if server.isLeader {
+		go time.AfterFunc(20*time.Second, func() {
+			server.heartBeatPing()
+			timerLoop <- struct{}{}
+		})
+	} else {
+		server.timer = time.AfterFunc(40*time.Second, func() {
+			server.electLeader()
+			timerLoop <- struct{}{}
+		})
+	}
 
 	// Listen to RPCs from frontend.
 	go server.serve(grpcServer, lis, wait)
@@ -91,6 +104,7 @@ func main() {
 }
 
 func (s *Server) electLeader() {
+	s.logf("Electing leader.")
 	OtherMin := min(s.nodes[0], s.nodes[1], s.nodes[2])
 	if *s.port < OtherMin {
 		s.isLeader = true
@@ -100,7 +114,7 @@ func (s *Server) electLeader() {
 			targetAddress := fmt.Sprintf("localhost:%d", port)
 			conn, err := grpc.NewClient(targetAddress, opts...)
 			if err != nil {
-				s.logger.Fatalf("Failed to dial: %v", err)
+				s.logf("Failed to dial: %v", err)
 			}
 			grpcClient := NewNodeClient(conn)
 			_, rpcerr := grpcClient.Demote(context.Background(), &Void{})
@@ -128,12 +142,12 @@ func (s *Server) heartBeatPing() {
 		targetAddress := fmt.Sprintf("localhost:%d", port)
 		conn, err := grpc.NewClient(targetAddress, opts...)
 		if err != nil {
-			s.logger.Fatalf("Failed to dial: %v", err)
+			s.logf("Failed to dial: %v", err)
 		}
 		grpcClient := NewNodeClient(conn)
 		_, rpcerr := grpcClient.Ping(context.Background(), &Void{})
 		if rpcerr != nil {
-			s.logf("Failed to Demote: %v", rpcerr)
+			s.logf("Failed to Ping: %v", rpcerr)
 		} else {
 			err = conn.Close()
 			if err != nil {
@@ -153,7 +167,7 @@ func (s *Server) readUserInput(wait chan struct{}) {
 	for {
 		reader.Scan()
 		if reader.Err() != nil {
-			s.logger.Fatalf("failed to call Read: %v", reader.Err())
+			s.fatalf("failed to call Read: %v", reader.Err())
 		}
 		text := reader.Text()
 		text = strings.ToLower(text)
@@ -178,7 +192,7 @@ func (s *Server) serve(server *grpc.Server, lis net.Listener, wait chan struct{}
 	err := server.Serve(lis)
 	if err != nil {
 		wait <- struct{}{}
-		s.logger.Fatalf("failed to serve: %v", err)
+		s.fatalf("failed to serve: %v", err)
 	}
 	s.logf("Listening on %s.\n", lis.Addr())
 }
@@ -210,9 +224,12 @@ func throwParseException(err string) {
 // Bid is the RPC executed when the frontend is forwarding a client request to
 // register a new bid in the current auction.
 func (s *Server) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
-	s.logf("Received bid request from client %d.", msg.GetSenderID())
+	s.updateLock.Lock()
+	defer s.updateLock.Unlock()
+
 	s.timestamp.UpdateTime(*msg.Timestamp)
 	s.timestamp.Increment() // timestamp for receive event from frontend
+	s.logf("Received bid request from client %d.", msg.GetSenderID())
 	timestamp := s.timestamp.Now()
 	state := EAck_Exception
 	if s.auction != nil {
@@ -265,12 +282,12 @@ func (s *Server) updateBackup(targetPort int64, outcome *Outcome, requestID *str
 	targetAddress := fmt.Sprintf("localhost:%d", targetPort)
 	conn, err := grpc.NewClient(targetAddress, opts...)
 	if err != nil {
-		s.logger.Fatalf("Failed to dial: %v", err)
+		s.logf("Failed to dial: %v", err)
 	}
 	defer func(conn *grpc.ClientConn) {
 		err = conn.Close()
 		if err != nil {
-			s.logger.Fatalf("Error closing connection:\n%v", err)
+			s.logf("Error closing connection:\n%v", err)
 		}
 	}(conn)
 
@@ -372,7 +389,7 @@ func (s *Server) Update(_ context.Context, msg *UpdateQuery) (*Void, error) {
 		outcome.GetAuctionEndTime())
 
 	s.timestamp.Increment() // timestamp for send event
-	s.logf("Responding to update from replica mananger at port %d.", outcome.GetSenderID())
+	s.logf("Responding to update from replica manager at port %d.", outcome.GetSenderID())
 	return s.generateVoidMessage(), nil
 }
 
