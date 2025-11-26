@@ -67,6 +67,8 @@ func main() {
 	// Starts a new auction.
 	timerLoop := make(chan struct{})
 	wait := make(chan struct{})
+
+	server.logf("Starting internal timer.")
 	if server.isLeader {
 		go time.AfterFunc(20*time.Second, func() {
 			server.heartBeatPing()
@@ -117,10 +119,21 @@ func (s *Server) electLeader() {
 				s.logf("Failed to dial: %v", err)
 			}
 			grpcClient := NewNodeClient(conn)
-			_, rpcerr := grpcClient.Demote(context.Background(), &Void{})
+			s.timestamp.Increment() // timestamp for send event
+			now := s.timestamp.Now()
+			response, rpcerr := grpcClient.Demote(context.Background(), &Void{
+				SenderID:  s.port,
+				Timestamp: &now,
+			})
+			if response != nil {
+				s.timestamp.UpdateTime(response.GetTimestamp())
+			}
+			s.timestamp.Increment() // Timestamp for receive event
+
 			if rpcerr != nil {
-				s.logf("Failed to Demote: %v", rpcerr)
+				s.logf("Failed to demote replica at port %d.", port)
 			} else {
+				s.logf("Received response to demotion which was sent to replica at port %d.", port)
 				err = conn.Close()
 				if err != nil {
 					s.logf("Error closing connection:\n%v", err)
@@ -130,13 +143,23 @@ func (s *Server) electLeader() {
 	}
 }
 
-func (s *Server) Demote(_ context.Context, _ *Void) (*Void, error) {
+func (s *Server) Demote(_ context.Context, msg *Void) (*Void, error) {
+	s.timestamp.UpdateTime(msg.GetTimestamp())
+	s.timestamp.Increment()
+	s.logf("Received demotion message.")
 	s.isLeader = false
-	return &Void{}, nil
+	s.timestamp.Increment()
+	now := s.timestamp.Now()
+	return &Void{
+		SenderID:  s.port,
+		Timestamp: &now,
+	}, nil
 }
 
 func (s *Server) heartBeatPing() {
+	s.logf("Broadcasting heart beat to backups.")
 	for _, port := range s.nodes {
+		s.timestamp.Increment() // Timestamp for send event
 		var opts []grpc.DialOption
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		targetAddress := fmt.Sprintf("localhost:%d", port)
@@ -145,10 +168,20 @@ func (s *Server) heartBeatPing() {
 			s.logf("Failed to dial: %v", err)
 		}
 		grpcClient := NewNodeClient(conn)
-		_, rpcerr := grpcClient.Ping(context.Background(), &Void{})
+		now := s.timestamp.Now()
+		pong, rpcerr := grpcClient.Ping(context.Background(), &Void{
+			SenderID:  s.port,
+			Timestamp: &now,
+		})
+		if pong != nil {
+			s.timestamp.UpdateTime(pong.GetTimestamp())
+		}
+		s.timestamp.Increment() // Timestamp for read event
+
 		if rpcerr != nil {
 			s.logf("Failed to Ping: %v", rpcerr)
 		} else {
+			s.logf("Received ping response from replica at port %d.", port)
 			err = conn.Close()
 			if err != nil {
 				s.logf("Error closing connection:\n%v", err)
@@ -239,6 +272,8 @@ func (s *Server) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error) {
 		} else {
 			state = EAck_Fail
 		}
+	} else {
+		s.logf("No auction active. Cannot accept bid request.")
 	}
 
 	s.timestamp.Increment() // timestamp for send event to frontend
@@ -447,5 +482,13 @@ func (s *Server) Ping(_ context.Context, void *Void) (*Void, error) {
 	if s.timer != nil {
 		s.timer.Reset(40 * time.Second)
 	}
-	return &Void{}, nil
+	s.timestamp.UpdateTime(void.GetTimestamp())
+	s.timestamp.Increment()
+	s.logf("Ping received. Sending pong.\n")
+	s.timestamp.Increment()
+	now := s.timestamp.Now()
+	return &Void{
+		SenderID:  s.port,
+		Timestamp: &now,
+	}, nil
 }
