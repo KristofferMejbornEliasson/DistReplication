@@ -69,7 +69,7 @@ func main() {
 
 func (c *Client) result(connection FrontendClient, timestamp uint64) {
 	c.timestamp.Increment() // timestamp for sending request to front end.
-	c.logf("Sending result request to server.")
+	c.logf("Sending result request to server.\n")
 	result, err := connection.Result(context.Background(), &Void{
 		SenderID:  &c.pid,
 		Timestamp: &timestamp,
@@ -82,36 +82,46 @@ func (c *Client) result(connection FrontendClient, timestamp uint64) {
 	if err != nil {
 		c.fatal(err)
 	}
-	c.logf("Received response to result request from server.")
+	c.logf("Received response to result request from server.\n")
 	if result.GetAuctionStartTime() == math.MinInt64 {
-		c.fatalf("No auction is running, nor has one ever run on the server.")
+		c.fatalf("No auction is running, nor has one ever run on the server.\n")
 	}
 
 	c.logf("Auction started at: %v\n", time.Unix(result.GetAuctionStartTime(), 0))
 	c.logf("Auction ended at: %v\n", time.Unix(result.GetAuctionEndTime(), 0))
 	if result.GetLeadingID() == math.MinInt64 {
-		c.logf("No-one has bid on the auction so far.")
+		c.logf("No-one has bid on the auction so far.\n")
 	} else {
 		c.logf("Leading bid is %d,- by %d.\n", result.GetLeadingBid(), result.GetLeadingID())
 	}
 }
 
 func (c *Client) bid(connection FrontendClient, timestamp uint64, arg *Argument) {
+	c.timestamp.Increment() // Timestamp for send event to frontend
 	response, err := connection.Bid(context.Background(), &BidRequest{
 		SenderID:  &c.pid,
 		Timestamp: &timestamp,
 		Amount:    &arg.amount,
 	})
-	if err != nil {
-		c.fatal(err)
+	if response != nil {
+		c.timestamp.UpdateTime(response.GetTimestamp())
 	}
-	switch response.GetAck() {
-	case EAck_Success:
-		fmt.Printf("Bid successful. You are highest bidder with %d,-\n", arg.amount)
-	case EAck_Fail:
-		fmt.Printf("Bid failed.\n")
-	default:
-		fmt.Printf("Bid failed. Exception occurred.\n")
+	c.timestamp.Increment() // Timestamp for receive event from frontend
+
+	if response == nil || err != nil {
+		c.fatalf("Bid failed. Exception occurred.\n")
+	}
+
+	if response != nil { // IDE doesn't realise this is only possible state
+		switch response.GetAck() {
+		case EAck_Success:
+			c.logf("Bid successful. You are the highest bidder with %d,-\n", arg.amount)
+		case EAck_Fail:
+			c.logf("Bid failed. An auction is not active, or you did not place a bid" +
+				" higher than the current leading bid.\n")
+		default:
+			c.logf("Bid failed. Exception occurred.\n")
+		}
 	}
 }
 
@@ -124,7 +134,7 @@ func (c *Client) shutdownLogging(writer *os.File) {
 // logf writes a message to the log file, appending a newline if necessary.
 // Mostly equivalent to log.Printf.
 func (c *Client) logf(format string, v ...any) {
-	prefix := fmt.Sprintf("Client %d. Time: %d. ", c.pid, c.timestamp)
+	prefix := fmt.Sprintf("Client %d. Time: %s. ", c.pid, c.timestamp)
 	c.logger.SetPrefix(prefix)
 	text := fmt.Sprintf(format, v...)
 	if !(strings.HasSuffix(text, "\n") || strings.HasSuffix(text, "\r")) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"os"
 	"strings"
@@ -69,7 +70,7 @@ func main() {
 // logf writes a message to the log file, appending a newline if necessary.
 // Mostly equivalent to log.Printf.
 func (f *Frontend) logf(format string, v ...any) {
-	prefix := fmt.Sprintf("Frontend at time %d: ", f.timestamp)
+	prefix := fmt.Sprintf("Frontend at time %s: ", f.timestamp)
 	f.logger.SetPrefix(prefix)
 	text := fmt.Sprintf(format, v...)
 	if !(strings.HasSuffix(text, "\n") || strings.HasSuffix(text, "\r")) {
@@ -111,13 +112,7 @@ func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error)
 
 		f.timestamp.Increment() // timestamp for send event (to client)
 		f.logf("Sending exception response to client %d.\n", msg.GetSenderID())
-		ack := EAck_Exception
-		now := f.timestamp.Now()
-		return &BidResponse{
-			SenderID:  msg.SenderID,
-			Timestamp: &now,
-			Ack:       &ack,
-		}, err
+		return f.generateErrorBidResponse(), err
 	}
 	defer func(conn *grpc.ClientConn) {
 		err := conn.Close()
@@ -146,7 +141,7 @@ func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error)
 
 		f.timestamp.Increment() // timestamp for send event (to client)
 		f.logf("Sending exception response to client %d.", msg.GetSenderID())
-		return response, err
+		return f.generateErrorBidResponse(), err
 	}
 
 	f.logf("Received outcome from replica manager via port %d:\n%v", f.primaryPort, response)
@@ -156,7 +151,7 @@ func (f *Frontend) Bid(_ context.Context, msg *BidRequest) (*BidResponse, error)
 
 	now = f.timestamp.Now()
 	newResponse := &BidResponse{
-		SenderID:  msg.SenderID,
+		SenderID:  &f.primaryPort,
 		Timestamp: &now,
 		Ack:       response.Ack,
 	}
@@ -179,7 +174,7 @@ func (f *Frontend) Result(_ context.Context, msg *Void) (*Outcome, error) {
 
 		f.timestamp.Increment() // timestamp for send event (to client)
 		f.logf("Sending exception response to client %d.", msg.GetSenderID())
-		return nil, err
+		return f.generateErrorOutcome(), err
 	}
 	defer func(conn *grpc.ClientConn) {
 		err := conn.Close()
@@ -212,15 +207,7 @@ func (f *Frontend) Result(_ context.Context, msg *Void) (*Outcome, error) {
 
 		f.timestamp.Increment() // timestamp for send event (to client)
 		f.logf("Sending exception response to client %d.", msg.GetSenderID())
-		now = f.timestamp.Now()
-		return &Outcome{
-			SenderID:         &f.primaryPort,
-			Timestamp:        &now,
-			AuctionStartTime: nil,
-			AuctionEndTime:   nil,
-			LeadingBid:       nil,
-			LeadingID:        nil,
-		}, err
+		return f.generateErrorOutcome(), err
 	}
 	f.logf("Received outcome from replica manager via port %d:\n%v", f.primaryPort, outcome)
 
@@ -239,4 +226,27 @@ func (f *Frontend) createConnection() (*grpc.ClientConn, error) {
 	opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	targetAddress := fmt.Sprintf("localhost:%d", f.primaryPort)
 	return grpc.NewClient(targetAddress, opts...)
+}
+
+func (f *Frontend) generateErrorBidResponse() *BidResponse {
+	now := f.timestamp.Now()
+	ack := EAck_Exception
+	return &BidResponse{
+		SenderID:  &f.primaryPort,
+		Timestamp: &now,
+		Ack:       &ack,
+	}
+}
+
+func (f *Frontend) generateErrorOutcome() *Outcome {
+	now := f.timestamp.Now()
+	var invalid int64 = math.MinInt64
+	return &Outcome{
+		SenderID:         &f.primaryPort,
+		Timestamp:        &now,
+		AuctionStartTime: &invalid,
+		AuctionEndTime:   &invalid,
+		LeadingBid:       nil,
+		LeadingID:        &invalid,
+	}
 }
