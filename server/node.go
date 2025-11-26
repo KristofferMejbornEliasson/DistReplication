@@ -215,6 +215,11 @@ func (s *Server) readUserInput(wait chan struct{}) {
 			s.startAuction()
 		}
 		if text == "state" || text == "auction" {
+			if s.isLeader {
+				fmt.Printf("This node is the leader.")
+			} else {
+				fmt.Printf("This node is not the leader.")
+			}
 			s.printAuction()
 		}
 	}
